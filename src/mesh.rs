@@ -4,7 +4,9 @@
 //!   - faces of type `Face<F>` and element tags
 //!
 //! F = C-1 cannot be imposed in rust stable
+use crate::hilbert::hilbert_indices;
 use crate::least_squares::LeastSquaresGradient;
+use crate::partition::Partitioner;
 use crate::simplices::{Simplex, EDGE_FACES, TETRA_FACES, TRIANGLE_FACES};
 use crate::to_simplices::{hex2tets, pri2tets, pyr2tets, qua2tris};
 use crate::vtu_output::{Encoding, VTUFile};
@@ -145,6 +147,9 @@ where
     /// Get the tag of the `i`th element
     fn etag(&self, i: usize) -> Tag;
 
+    /// Get the tag of the `i`th element
+    fn mut_etag(&mut self, i: usize) -> &mut Tag;
+
     /// Parallel iterator over the element tags
     fn par_etags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
         (0..self.n_elems()).into_par_iter().map(|i| self.etag(i))
@@ -212,6 +217,9 @@ where
 
     /// Get the tag of the `i`th face
     fn ftag(&self, i: usize) -> Tag;
+
+    /// Get the tag of the `i`th face
+    fn mut_ftag(&mut self, i: usize) -> &mut Tag;
 
     /// Parallel iterator over the mesh faces
     fn par_ftags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
@@ -327,6 +335,17 @@ where
             }
         }
         res
+    }
+
+    /// Compute element pairs corresponding to all the internal faces (for partitioning)
+    fn element_pairs(&self, faces: &FxHashMap<Face<F>, [usize; 3]>) -> CSRGraph {
+        let e2e = faces
+            .iter()
+            .map(|(_, &[_, i0, i1])| [i0, i1])
+            .filter(|&[i0, i1]| i0 != usize::MAX && i1 != usize::MAX)
+            .collect::<Vec<_>>();
+
+        CSRGraph::from_edges(e2e.iter())
     }
 
     /// Fix the orientation of elements (so that their volume is >0) and of faces
@@ -625,7 +644,7 @@ where
         self.add_faces(new_faces.iter().cloned(), new_ftags.iter().cloned());
     }
 
-    /// Reorder the mesh:
+    /// Reorder the mesh (RCM):
     ///   - RCM orderting based on the vertex-to-vertex connectivity is used for the mesh vertices
     ///   - elements and faces are sorted by their minimum vertex index
     fn reorder_rcm(&self) -> (Self, Vec<usize>, Vec<usize>, Vec<usize>) {
@@ -640,6 +659,56 @@ where
         res.reorder_faces(&face_ids);
 
         (res, vert_ids, elem_ids, face_ids)
+    }
+
+    /// Set the partition as etags from an usize slice
+    fn set_partition(&mut self, part: &[usize]) {
+        assert_eq!(self.n_elems(), part.len());
+        (0..part.len()).for_each(|i| {
+            assert!(part[i] < Tag::MAX as usize - 1);
+            *self.mut_etag(i) = part[i] as Tag + 1;
+        });
+    }
+
+    /// Reorder the mesh (Hilbert):
+    ///   - RCM orderting based on the vertex-to-vertex connectivity is used for the mesh vertices
+    ///   - elements and faces are sorted by their minimum vertex index
+    fn reorder_hilbert(&self) -> (Self, Vec<usize>, Vec<usize>, Vec<usize>) {
+        let vert_ids = hilbert_indices(self.verts().cloned());
+        let mut res = self.reorder_vertices(&vert_ids);
+
+        let elem_ids = sort_elem_min_ids(res.elems().cloned());
+        res.reorder_elems(&elem_ids);
+
+        let face_ids = sort_elem_min_ids(res.faces().cloned());
+        res.reorder_faces(&face_ids);
+
+        (res, vert_ids, elem_ids, face_ids)
+    }
+
+    /// Get the i-th partition
+    fn get_partition<M: Mesh<D, C, F>>(&self, i: usize) -> M
+    where
+        Self: std::marker::Sized,
+    {
+        self.extract_elems(|t| t == i as Tag + 1)
+    }
+
+    /// Partition the mesh (RCM ordering applied to the element to element connectivity)
+    fn partition<P: Partitioner>(
+        &mut self,
+        n_parts: usize,
+        weights: Option<Vec<f64>>,
+    ) -> Result<(f64, f64)> {
+        let partitioner = P::new(self, n_parts, weights)?;
+        let parts = partitioner.compute()?;
+
+        let quality = partitioner.partition_quality(&parts);
+        let imbalance = partitioner.partition_imbalance(&parts);
+
+        self.set_partition(&parts);
+
+        Ok((quality, imbalance))
     }
 
     /// Randomly shuffle vertices, elements and faces

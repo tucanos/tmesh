@@ -13,6 +13,7 @@ jobs:
   lib:
     runs-on: ubuntu-latest
     steps:
+    - run: sudo apt-get -y install libclang-dev libmetis-dev
     - uses: actions/checkout@v4
     - name: Fmt
       run: cargo fmt --check --all
@@ -22,14 +23,20 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Clippy (with metis)
+      run: cargo clippy --features=metis
+    - name: Run tests (with metis)
+      run: cargo test --verbose --features=metis
 
   examples:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - run: sudo apt-get install -y gmsh
+    - run: sudo apt-get install -y gmsh libclang-dev libmetis-dev
     - name: Run examples/dual_mesh_2d
-      run: cd examples/dual_mesh_2d; cargo run
+      run: cargo run --example dual_mesh_2d --release
+    - name: Run examples/partition_3d
+      run: cargo run --example partition_3d --release --features=metis
 
   python:
     runs-on: ubuntu-latest

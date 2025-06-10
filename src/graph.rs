@@ -1,5 +1,6 @@
 //! Basic graphs to compute and store connectivities that can not be stored in
 //! simple 2d arrays
+use crate::{Error, Result};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 /// Compute the indices that would sort `data`
@@ -228,7 +229,7 @@ impl CSRGraph {
         let mut res = Vec::with_capacity(self.n());
         for (i_row, row) in self.rows().enumerate() {
             let mut n = row.len();
-            if row.iter().any(|&j| j == i_row) {
+            if row.contains(&i_row) {
                 n += 1;
             }
             res.push(n);
@@ -237,7 +238,7 @@ impl CSRGraph {
     }
 
     /// Compute the Reverse Cuthill McKee ordering
-    pub fn reverse_cuthill_mckee(self) -> Vec<usize> {
+    pub fn reverse_cuthill_mckee(&self) -> Vec<usize> {
         // strongly inspired from scipy
         let mut order = vec![0; self.n()];
         let degree = self.node_degrees();
@@ -302,12 +303,68 @@ impl CSRGraph {
         // return reversed order for RCM ordering
         order.iter().rev().copied().collect()
     }
+
+    /// Compute the connected components
+    pub fn connected_components(&self) -> Result<Vec<usize>> {
+        Ok(ConnectedComponents::new(self)?.vtag)
+    }
+}
+
+/// Connected components of a graph
+#[derive(Debug)]
+struct ConnectedComponents {
+    pub vtag: Vec<usize>,
+}
+
+impl ConnectedComponents {
+    /// Compute the connected components of a CSR graph
+    pub fn new(g: &CSRGraph) -> Result<Self> {
+        assert_eq!(g.n(), g.m());
+
+        let mut res = Self {
+            vtag: vec![usize::MAX; g.n()],
+        };
+        res.compute(g)?;
+        Ok(res)
+    }
+
+    fn compute_from(&mut self, g: &CSRGraph, starts: &[usize], component: usize) {
+        let mut next_starts = Vec::new();
+        for &start in starts {
+            self.vtag[start] = component;
+            for i in g.row(start).iter().copied() {
+                if self.vtag[i] == usize::MAX {
+                    self.vtag[i] = component;
+                    next_starts.push(i);
+                }
+            }
+        }
+        if !starts.is_empty() {
+            self.compute_from(g, &next_starts, component);
+        }
+    }
+
+    fn compute(&mut self, g: &CSRGraph) -> Result<()> {
+        let mut start = 0;
+        let mut component = 0;
+        while start < g.n() {
+            self.compute_from(g, &[start], component);
+            while start < g.n() && self.vtag[start] < usize::MAX {
+                start += 1;
+            }
+            component += 1;
+            if component == usize::MAX {
+                return Err(Error::from("too many connected components"));
+            }
+            assert!(component < usize::MAX);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use super::*;
+    use crate::graph::{reindex, CSRGraph};
 
     #[test]
     fn test_reindex() {
@@ -387,5 +444,13 @@ mod tests {
         let ids = graph.reverse_cuthill_mckee();
         // computed using the scipy code and forcing stable sort
         assert_eq!(ids, [5, 8, 7, 2, 9, 4, 1, 0, 6, 3]);
+    }
+
+    #[test]
+    fn test_cc() {
+        let g = [[0, 1], [1, 2], [2, 0], [3, 4]];
+        let g = CSRGraph::from_edges(g.iter());
+        let cc = g.connected_components().unwrap();
+        assert_eq!(cc, [0, 0, 0, 1, 1]);
     }
 }

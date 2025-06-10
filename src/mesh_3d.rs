@@ -193,6 +193,10 @@ impl Mesh<3, 4, 3> for Mesh3d {
         self.etags[i]
     }
 
+    fn mut_etag(&mut self, i: usize) -> &mut Tag {
+        &mut self.etags[i]
+    }
+
     fn add_elems<I1: ExactSizeIterator<Item = Tetrahedron>, I2: ExactSizeIterator<Item = Tag>>(
         &mut self,
         elems: I1,
@@ -236,6 +240,10 @@ impl Mesh<3, 4, 3> for Mesh3d {
         self.ftags[i]
     }
 
+    fn mut_ftag(&mut self, i: usize) -> &mut Tag {
+        &mut self.ftags[i]
+    }
+
     fn add_faces<I1: ExactSizeIterator<Item = Triangle>, I2: ExactSizeIterator<Item = Tag>>(
         &mut self,
         faces: I1,
@@ -274,6 +282,7 @@ mod tests {
         assert_delta,
         mesh::{bandwidth, cell_center, Mesh},
         mesh_3d::{box_mesh, Mesh3d},
+        partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
         simplices::Simplex,
         Tetrahedron, Vert3d,
     };
@@ -389,5 +398,104 @@ mod tests {
         }
 
         msh_rcm.check(&msh_rcm.compute_faces()).unwrap();
+    }
+
+    #[test]
+    fn test_part_rcm() {
+        let mut msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
+        let (quality, imbalance) = msh.partition::<RCMPartitioner>(4, None).unwrap();
+
+        assert!(quality < 0.045);
+        assert!(imbalance < 0.0002);
+
+        for i in 0..4 {
+            let part: Mesh3d = msh.get_partition(i);
+            let cc = part
+                .compute_vertex_to_vertices()
+                .connected_components()
+                .unwrap();
+            let n_cc = cc.iter().cloned().max().unwrap() + 1;
+            assert_eq!(n_cc, 1);
+        }
+    }
+
+    #[test]
+    fn test_hilbert() {
+        let msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
+        let avg_bandwidth = bandwidth(msh.elems().cloned()).1;
+        assert!(avg_bandwidth > 1000.0);
+
+        let (msh_hilbert, vert_ids, elem_ids, face_ids) = msh.reorder_hilbert();
+        let avg_bandwidth_hilbert = bandwidth(msh_hilbert.elems().cloned()).1;
+        assert!(avg_bandwidth_hilbert < 440.0);
+
+        for (i, v) in msh_hilbert.verts().enumerate() {
+            let other = msh.vert(vert_ids[i]);
+            assert!((v - other).norm() < 1e-12);
+        }
+
+        for (i, v) in msh_hilbert.gelems().enumerate() {
+            let v = cell_center(v);
+            let other = msh.gelem(msh.elem(elem_ids[i]));
+            let other = cell_center(other);
+            assert!((v - other).norm() < 1e-12);
+        }
+
+        for (i, tag) in msh_hilbert.etags().enumerate() {
+            let other = msh.etag(elem_ids[i]);
+            assert_eq!(tag, other);
+        }
+
+        for (i, v) in msh_hilbert.gfaces().enumerate() {
+            let v = cell_center(v);
+            let other = msh.gface(msh.face(face_ids[i]));
+            let other = cell_center(other);
+            assert!((v - other).norm() < 1e-12);
+        }
+
+        for (i, tag) in msh_hilbert.ftags().enumerate() {
+            let other = msh.ftag(face_ids[i]);
+            assert_eq!(tag, other);
+        }
+
+        msh_hilbert.check(&msh_hilbert.compute_faces()).unwrap();
+    }
+
+    #[test]
+    fn test_part_hilbert() {
+        let mut msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
+        let (quality, imbalance) = msh.partition::<HilbertPartitioner>(4, None).unwrap();
+
+        assert!(quality < 0.04);
+        assert!(imbalance < 0.0002);
+
+        for i in 0..4 {
+            let part: Mesh3d = msh.get_partition(i);
+            let cc = part
+                .compute_vertex_to_vertices()
+                .connected_components()
+                .unwrap();
+            let n_cc = cc.iter().cloned().max().unwrap() + 1;
+            assert_eq!(n_cc, 1);
+        }
+    }
+
+    #[test]
+    fn test_part_kmeans() {
+        let mut msh = box_mesh::<Mesh3d>(1.0, 6, 1.0, 5, 1.0, 5).random_shuffle();
+        let (quality, imbalance) = msh.partition::<KMeansPartitioner3d>(4, None).unwrap();
+
+        assert!(quality < 0.11);
+        assert!(imbalance < 0.04);
+
+        for i in 0..4 {
+            let part: Mesh3d = msh.get_partition(i);
+            let cc = part
+                .compute_vertex_to_vertices()
+                .connected_components()
+                .unwrap();
+            let n_cc = cc.iter().cloned().max().unwrap() + 1;
+            assert_eq!(n_cc, 1);
+        }
     }
 }

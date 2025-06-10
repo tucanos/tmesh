@@ -64,6 +64,10 @@ impl Mesh<2, 2, 1> for BoundaryMesh2d {
         self.etags[i]
     }
 
+    fn mut_etag(&mut self, i: usize) -> &mut Tag {
+        &mut self.etags[i]
+    }
+
     fn add_elems<I1: ExactSizeIterator<Item = Edge>, I2: ExactSizeIterator<Item = Tag>>(
         &mut self,
         elems: I1,
@@ -102,6 +106,10 @@ impl Mesh<2, 2, 1> for BoundaryMesh2d {
 
     fn ftag(&self, i: usize) -> Tag {
         self.ftags[i]
+    }
+
+    fn mut_ftag(&mut self, i: usize) -> &mut Tag {
+        &mut self.ftags[i]
     }
 
     fn add_faces<I1: ExactSizeIterator<Item = Node>, I2: ExactSizeIterator<Item = Tag>>(

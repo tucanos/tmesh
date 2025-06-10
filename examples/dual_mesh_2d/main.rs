@@ -1,5 +1,5 @@
+//! Dual meshes in 2d
 use std::{path::Path, process::Command};
-
 use tmesh::{
     boundary_mesh_2d::BoundaryMesh2d,
     dual_mesh::{DualMesh, DualType},
@@ -51,7 +51,11 @@ fn main() -> Result<()> {
             .arg(fname.to_str().unwrap())
             .output()?;
 
-        assert!(output.status.success())
+        assert!(
+            output.status.success(),
+            "gmsh error: {}",
+            String::from_utf8(output.stderr).unwrap()
+        )
     }
 
     let msh = Mesh2d::from_meshb(fname.to_str().unwrap())?;
