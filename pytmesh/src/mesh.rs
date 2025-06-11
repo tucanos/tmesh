@@ -9,6 +9,8 @@ use pyo3::{
     pyclass, pymethods,
     types::PyType,
 };
+#[cfg(feature = "metis")]
+use tmesh::partition::{MetisKWay, MetisPartitioner, MetisRecursive};
 use tmesh::{
     Tag, Vertex,
     boundary_mesh_2d::BoundaryMesh2d,
@@ -16,7 +18,26 @@ use tmesh::{
     mesh::Mesh,
     mesh_2d::{Mesh2d, nonuniform_rectangle_mesh},
     mesh_3d::{Mesh3d, nonuniform_box_mesh},
+    partition::{HilbertPartitioner, KMeansPartitioner2d, KMeansPartitioner3d, RCMPartitioner},
 };
+
+/// Partitionner type
+#[pyclass(eq, eq_int)]
+#[derive(Clone, PartialEq)]
+pub enum PyPartitionerType {
+    /// Hilbert
+    Hilbert,
+    /// RCM
+    RCM,
+    /// KMeans
+    KMeans,
+    #[cfg(feature = "metis")]
+    /// Metis - Recursive
+    MetisRecursive,
+    #[cfg(feature = "metis")]
+    /// Metis - KWay
+    MetisKWay,
+}
 
 macro_rules! create_mesh {
     ($pyname: ident, $name: ident, $dim: expr, $cell_dim: expr, $face_dim: expr) => {
@@ -269,11 +290,73 @@ macro_rules! create_mesh {
                 )
             }
 
+            /// Reorder the mesh using a Hilbert curve
+            fn reorder_hilbert<'py>(
+                &mut self,
+                py: Python<'py>,
+            ) -> (
+                Self,
+                Bound<'py, PyArray1<usize>>,
+                Bound<'py, PyArray1<usize>>,
+                Bound<'py, PyArray1<usize>>,
+            ) {
+                let (new_mesh, vert_ids, face_ids, elem_ids) = self.0.reorder_hilbert();
+                (
+                    Self(new_mesh),
+                    PyArray1::from_vec(py, vert_ids),
+                    PyArray1::from_vec(py, face_ids),
+                    PyArray1::from_vec(py, elem_ids),
+                )
+            }
+
             /// Check that two meshes are equal
             fn check_equals(&self, other: &Self, tol: f64) -> PyResult<()> {
                 self.0
                     .check_equals(&other.0, tol)
                     .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            }
+
+            /// Partition the mesh
+            #[pyo3(signature = (n_parts, method=PyPartitionerType::Hilbert, weights=None))]
+            fn partition(
+                &mut self,
+                n_parts: usize,
+                method: PyPartitionerType,
+                weights: Option<PyReadonlyArray1<f64>>,
+            ) -> PyResult<(f64, f64)> {
+                let weights = weights.map(|x| x.as_slice().unwrap().to_vec());
+                match method {
+                    PyPartitionerType::Hilbert => self
+                        .0
+                        .partition::<HilbertPartitioner>(n_parts, weights)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string())),
+                    PyPartitionerType::RCM => self
+                        .0
+                        .partition::<RCMPartitioner>(n_parts, weights)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string())),
+                    PyPartitionerType::KMeans => match $dim {
+                        3 => self
+                            .0
+                            .partition::<KMeansPartitioner3d>(n_parts, weights)
+                            .map_err(|e| PyRuntimeError::new_err(e.to_string())),
+                        2 => self
+                            .0
+                            .partition::<KMeansPartitioner2d>(n_parts, weights)
+                            .map_err(|e| PyRuntimeError::new_err(e.to_string())),
+                        _ => unimplemented!(),
+                    },
+                    #[cfg(feature = "metis")]
+                    PyPartitionerType::MetisRecursive => self
+                        .0
+                        .partition::<MetisPartitioner<MetisRecursive>>(n_parts, weights)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string())),
+
+                    #[cfg(feature = "metis")]
+                    PyPartitionerType::MetisKWay => self
+                        .0
+                        .partition::<MetisPartitioner<MetisKWay>>(n_parts, weights)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string())),
+                }
             }
         }
     };

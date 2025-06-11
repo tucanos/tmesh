@@ -14,5 +14,8 @@ numpy = "0.25.0"
 pyo3 = { version = "0.25.0", features = ["extension-module", "multiple-pymethods"] }
 pyo3-log = "0.12"
 
+[features]
+metis = ["tmesh/metis"]
+
 [lints.rust]
 missing_docs = "warn"

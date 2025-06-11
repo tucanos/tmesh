@@ -42,5 +42,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - run: sudo apt-get install -y gmsh libclang-dev libmetis-dev
     - name: Python bindings
-      run: cd pytmesh; pip install vtk==9.3; pip install -e .; python -m unittest discover
+      run: |
+        cd pytmesh
+        pip install vtk==9.3
+        pip install -e .
+        python -m unittest discover
+    - name: Python bindings (with metis)
+      run: |
+        cd pytmesh
+        pip install vtk==9.3
+        echo "" >> pyproject.toml
+        echo "[tool.maturin]" >> pyproject.toml
+        echo "features = [\"metis\"]" >> pyproject.toml
+        pip install -e .
+        python -c "import pytmesh; assert pytmesh.HAVE_METIS"
+        python -m unittest discover
