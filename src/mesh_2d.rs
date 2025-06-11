@@ -209,10 +209,11 @@ impl Mesh<2, 3, 2> for Mesh2d {
 mod tests {
     use crate::{
         assert_delta,
+        boundary_mesh_2d::BoundaryMesh2d,
         mesh::{bandwidth, cell_center, Mesh},
         mesh_2d::{rectangle_mesh, Mesh2d},
         simplices::Simplex,
-        Triangle, Vert2d,
+        Edge, Triangle, Vert2d,
     };
     use rayon::iter::ParallelIterator;
 
@@ -372,5 +373,22 @@ mod tests {
         }
 
         msh_rcm.check(&msh_rcm.compute_faces()).unwrap();
+    }
+
+    #[test]
+    fn test_split() {
+        let msh = rectangle_mesh::<Mesh2d>(1.0, 2, 1.0, 2).random_shuffle();
+
+        let msh = msh.split();
+        assert_eq!(msh.n_verts(), 9);
+        assert_eq!(msh.n_faces(), 8);
+        assert_eq!(msh.n_elems(), 8);
+
+        let (bdy, _): (BoundaryMesh2d, _) = msh.boundary();
+        let area = bdy.gelems().map(Edge::vol).sum::<f64>();
+        assert_delta!(area, 4.0, 1e-10);
+
+        let vol = msh.gelems().map(Triangle::vol).sum::<f64>();
+        assert_delta!(vol, 1.0, 1e-10);
     }
 }

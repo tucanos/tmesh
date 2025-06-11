@@ -17,6 +17,7 @@ pub mod mesh_3d;
 pub mod partition;
 pub mod poly_mesh;
 pub mod simplices;
+mod split;
 mod to_simplices;
 mod vtu_output;
 

@@ -358,6 +358,12 @@ macro_rules! create_mesh {
                         .map_err(|e| PyRuntimeError::new_err(e.to_string())),
                 }
             }
+
+            /// Uniform mesh split
+            fn split(&self) -> Self {
+                let msh = self.0.split();
+                Self(msh)
+            }
         }
     };
 }

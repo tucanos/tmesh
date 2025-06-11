@@ -8,6 +8,7 @@ use crate::hilbert::hilbert_indices;
 use crate::least_squares::LeastSquaresGradient;
 use crate::partition::Partitioner;
 use crate::simplices::{Simplex, EDGE_FACES, TETRA_FACES, TRIANGLE_FACES};
+use crate::split::{split_edgs, split_tets, split_tris};
 use crate::to_simplices::{hex2tets, pri2tets, pyr2tets, qua2tris};
 use crate::vtu_output::{Encoding, VTUFile};
 use crate::{graph::CSRGraph, Cell, Edge, Error, Face, Result, Tag, Vertex};
@@ -1131,5 +1132,56 @@ where
         }
 
         Ok(())
+    }
+
+    /// Split a mesh uniformly
+    fn split(&self) -> Self {
+        let mut res = Self::empty();
+
+        let mut edges = self.compute_edges();
+
+        // Vertices
+        res.add_verts(self.verts().cloned());
+        let mut verts = vec![Vertex::<D>::zeros(); edges.len()];
+        for (edg, &i) in &edges {
+            let p0 = self.vert(edg[0]);
+            let p1 = self.vert(edg[1]);
+            verts[i] = 0.5 * (p0 + p1);
+        }
+        res.add_verts(verts.iter().cloned());
+
+        // add offset to verts
+        edges.iter_mut().for_each(|(_, v)| *v += self.n_verts());
+
+        // Cells
+        match C {
+            4 => {
+                let (elems, etags) = split_tets(self.elems().zip(self.etags()), &edges);
+                res.add_elems(elems.iter().cloned(), etags.iter().cloned());
+            }
+            3 => {
+                let (elems, etags) = split_tris(self.elems().zip(self.etags()), &edges);
+                res.add_elems(elems.iter().cloned(), etags.iter().cloned());
+            }
+            2 => {
+                let (elems, etags) = split_edgs(self.elems().zip(self.etags()), &edges);
+                res.add_elems(elems.iter().cloned(), etags.iter().cloned());
+            }
+            _ => unreachable!(),
+        }
+
+        // Faces
+        match F {
+            3 => {
+                let (faces, ftags) = split_tris(self.faces().zip(self.ftags()), &edges);
+                res.add_faces(faces.iter().cloned(), ftags.iter().cloned());
+            }
+            2 => {
+                let (faces, ftags) = split_edgs(self.faces().zip(self.ftags()), &edges);
+                res.add_faces(faces.iter().cloned(), ftags.iter().cloned());
+            }
+            _ => unreachable!(),
+        }
+        res
     }
 }

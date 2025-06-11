@@ -280,11 +280,12 @@ impl Mesh<3, 4, 3> for Mesh3d {
 mod tests {
     use crate::{
         assert_delta,
+        boundary_mesh_3d::BoundaryMesh3d,
         mesh::{bandwidth, cell_center, Mesh},
         mesh_3d::{box_mesh, Mesh3d},
         partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
         simplices::Simplex,
-        Tetrahedron, Vert3d,
+        Tetrahedron, Triangle, Vert3d,
     };
     use rayon::iter::ParallelIterator;
 
@@ -497,5 +498,22 @@ mod tests {
             let n_cc = cc.iter().cloned().max().unwrap() + 1;
             assert_eq!(n_cc, 1);
         }
+    }
+
+    #[test]
+    fn test_split() {
+        let msh = box_mesh::<Mesh3d>(1.0, 2, 1.0, 2, 1.0, 2).random_shuffle();
+
+        let msh = msh.split();
+        assert_eq!(msh.n_verts(), 27);
+        assert_eq!(msh.n_faces(), 12 * 4);
+        assert_eq!(msh.n_elems(), 6 * 8);
+
+        let (bdy, _): (BoundaryMesh3d, _) = msh.boundary();
+        let area = bdy.gelems().map(Triangle::vol).sum::<f64>();
+        assert_delta!(area, 6.0, 1e-10);
+
+        let vol = msh.gelems().map(Tetrahedron::vol).sum::<f64>();
+        assert_delta!(vol, 1.0, 1e-10);
     }
 }

@@ -103,3 +103,15 @@ class TestMeshes(unittest.TestCase):
         quality, imbalance = msh.partition(4, PartitionerType.Hilbert)
         self.assertLess(quality, 0.06)
         self.assertLess(imbalance, 0.0012)
+
+    def test_split(self):
+        nx = 10
+        ny = 15
+        nz = 20
+        msh = Mesh3d.box_mesh(
+            np.linspace(0, 1, nx), np.linspace(0, 2, ny), np.linspace(0, 3, nz)
+        )
+
+        split = msh.split()
+        self.assertEqual(split.n_elems(), 8 * msh.n_elems())
+        self.assertEqual(split.n_faces(), 4 * msh.n_faces())
