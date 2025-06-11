@@ -399,6 +399,17 @@ impl PyMesh2d {
 }
 
 #[pymethods]
+impl PyBoundaryMesh3d {
+    /// Read a stl file
+    #[classmethod]
+    pub fn read_stl(_cls: &Bound<'_, PyType>, file_name: String) -> PyResult<Self> {
+        let msh = BoundaryMesh3d::read_stl(&file_name)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(Self(msh))
+    }
+}
+
+#[pymethods]
 impl PyMesh3d {
     /// Build a nonuniform box mesh by splitting a structured
     /// mesh

@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy  # type: ignore
-from . import Mesh2d, Mesh3d, PartitionerType
+from . import Mesh2d, Mesh3d, PartitionerType, BoundaryMesh3d
 
 
 class TestMeshes(unittest.TestCase):
@@ -115,3 +115,97 @@ class TestMeshes(unittest.TestCase):
         split = msh.split()
         self.assertEqual(split.n_elems(), 8 * msh.n_elems())
         self.assertEqual(split.n_faces(), 4 * msh.n_faces())
+
+    def test_stl(self):
+        stl = """solid exported
+	facet normal 0 0 1
+		outer loop
+			vertex -20 -20 40
+			vertex 20 -20 40
+			vertex -20 20 40
+		endloop
+	endfacet
+	facet normal 0 0 -1
+		outer loop
+			vertex 20 20 0
+			vertex -20 -20 0
+			vertex -20 20 0
+		endloop
+	endfacet
+	facet normal 0 0 -1
+		outer loop
+			vertex -20 -20 0
+			vertex 20 20 0
+			vertex 20 -20 0
+		endloop
+	endfacet
+	facet normal 0 0 1
+		outer loop
+			vertex 20 20 40
+			vertex -20 20 40
+			vertex 20 -20 40
+		endloop
+	endfacet
+	facet normal 0 -1 0
+		outer loop
+			vertex -20 -20 0
+			vertex 20 -20 0
+			vertex 20 -20 40
+		endloop
+	endfacet
+	facet normal -1 0 0
+		outer loop
+			vertex -20 -20 0
+			vertex -20 20 40
+			vertex -20 20 0
+		endloop
+	endfacet
+	facet normal 1 0 0
+		outer loop
+			vertex 20 20 40
+			vertex 20 -20 40
+			vertex 20 -20 0
+		endloop
+	endfacet
+	facet normal 0 1 0
+		outer loop
+			vertex -20 20 0
+			vertex -20 20 40
+			vertex 20 20 40
+		endloop
+	endfacet
+	facet normal -1 0 0
+		outer loop
+			vertex -20 -20 0
+			vertex -20 -20 40
+			vertex -20 20 40
+		endloop
+	endfacet
+	facet normal 1 0 0
+		outer loop
+			vertex 20 -20 0
+			vertex 20 20 0
+			vertex 20 20 40
+		endloop
+	endfacet
+	facet normal 0 -1 0
+		outer loop
+			vertex 20 -20 40
+			vertex -20 -20 40
+			vertex -20 -20 0
+		endloop
+	endfacet
+	facet normal 0 1 0
+		outer loop
+			vertex 20 20 40
+			vertex 20 20 0
+			vertex -20 20 0
+		endloop
+	endfacet
+endsolid exported"""
+
+        with open("cube.stl", "w") as f:
+            f.write(stl)
+
+        msh = BoundaryMesh3d.read_stl("cube.stl")
+        self.assertEqual(msh.n_elems(), 12)
