@@ -1,5 +1,7 @@
 //! Boundary of `Mesh3d`
-use crate::{mesh::Mesh, Edge, Tag, Triangle, Vert3d};
+use std::fs::OpenOptions;
+
+use crate::{mesh::Mesh, Edge, Result, Tag, Triangle, Vert3d};
 
 /// Triangle mesh in 3d
 pub struct BoundaryMesh3d {
@@ -26,6 +28,27 @@ impl BoundaryMesh3d {
             faces,
             ftags,
         }
+    }
+
+    /// Read a stl file
+    pub fn read_stl(file_name: &str) -> Result<Self> {
+        let mut file = OpenOptions::new().read(true).open(file_name).unwrap();
+        let stl = stl_io::read_stl(&mut file).unwrap();
+
+        let mut verts = Vec::with_capacity(stl.vertices.len());
+        verts.extend(
+            stl.vertices
+                .iter()
+                .map(|v| Vert3d::new(f64::from(v[0]), f64::from(v[1]), f64::from(v[2]))),
+        );
+
+        let mut elems = Vec::with_capacity(3 * stl.faces.len());
+        elems.extend(stl.faces.iter().map(|v| v.vertices));
+        let etags = vec![1; stl.faces.len()];
+        let faces = Vec::new();
+        let ftags = Vec::new();
+
+        Ok(Self::new(verts, elems, etags, faces, ftags))
     }
 }
 
