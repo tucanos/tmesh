@@ -1,12 +1,8 @@
 //! Computation of the dual for `Mesh<2, 3, 2>`
-use crate::dual_mesh::{circumcenter_bcoords, DualCellCenter};
-use crate::mesh::cell_vertex;
-use crate::poly_mesh::{PolyMesh, PolyMeshType};
+use super::{circumcenter_bcoords, DualCellCenter, DualMesh, DualType, PolyMesh, PolyMeshType};
 use crate::{
-    dual_mesh::{DualMesh, DualType},
-    mesh::{cell_center, sort_elem_min_ids, Mesh},
-    simplices::Simplex,
-    Edge, Tag, Triangle, Vert2d,
+    mesh::{cell_center, cell_vertex, sort_elem_min_ids, Edge, Mesh, Simplex, Triangle},
+    Tag, Vert2d,
 };
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
@@ -294,7 +290,7 @@ impl DualMesh<2, 3, 2> for DualMesh2d {
             edges[i_edg] = edg;
         }
 
-        let ids = sort_elem_min_ids(edges.iter().copied());
+        let ids = sort_elem_min_ids(edges.iter());
         let edges = ids
             .iter()
             .filter(|&&i| edge_normals[i].norm() > 1e-12)
@@ -346,13 +342,9 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        dual_mesh::{DualMesh, DualType},
-        dual_mesh_2d::DualMesh2d,
-        mesh::Mesh,
-        mesh_2d::{rectangle_mesh, Mesh2d},
-        poly_mesh::PolyMesh,
-        simplices::Simplex,
-        Edge, Vert2d,
+        dual::{DualMesh, DualMesh2d, DualType, PolyMesh},
+        mesh::{rectangle_mesh, Edge, Mesh, Mesh2d, Simplex},
+        Vert2d,
     };
     use rayon::iter::ParallelIterator;
 

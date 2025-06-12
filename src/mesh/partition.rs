@@ -1,11 +1,6 @@
 //! Mesh partitioners
-use crate::{
-    graph::CSRGraph,
-    hilbert::hilbert_indices,
-    mesh::{cell_center, Mesh},
-    simplices::Simplex,
-    Cell, Error, Face, Result, Vert2d, Vert3d,
-};
+use super::{cell_center, hilbert::hilbert_indices, Cell, Face, Mesh, Simplex};
+use crate::{graph::CSRGraph, Error, Result, Vert2d, Vert3d};
 use coupe::Partition;
 #[cfg(feature = "metis")]
 use std::marker::PhantomData;
@@ -354,6 +349,7 @@ impl MetisPartMethod for MetisKWay {
 pub struct MetisPartitioner<T: MetisPartMethod> {
     n_parts: usize,
     graph: CSRGraph,
+    #[allow(dead_code)]
     weights: Vec<f64>,
     t: PhantomData<T>,
 }
@@ -422,15 +418,14 @@ impl<T: MetisPartMethod> Partitioner for MetisPartitioner<T> {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "metis")]
-    use crate::partition::{MetisPartitioner, MetisRecursive};
-    use crate::{
-        mesh::Mesh,
-        mesh_2d::{rectangle_mesh, Mesh2d},
-        mesh_3d::{box_mesh, Mesh3d},
+    use crate::mesh::partition::{MetisPartitioner, MetisRecursive};
+    use crate::mesh::{
+        box_mesh,
         partition::{
             HilbertPartitioner, KMeansPartitioner2d, KMeansPartitioner3d, Partitioner,
             RCMPartitioner,
         },
+        rectangle_mesh, Mesh, Mesh2d, Mesh3d,
     };
 
     #[test]

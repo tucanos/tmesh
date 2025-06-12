@@ -1,6 +1,6 @@
+use super::{Cell, Edge};
+use crate::Tag;
 use rustc_hash::FxHashMap;
-
-use crate::{Cell, Edge, Tag};
 
 pub(crate) fn split_edgs<'a, const C: usize, I: ExactSizeIterator<Item = (&'a Cell<C>, Tag)>>(
     elems_and_tags: I,

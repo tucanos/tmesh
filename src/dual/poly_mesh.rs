@@ -1,9 +1,8 @@
 //! General polyline, polygon and polyhedral meshes
 use crate::{
-    mesh::Mesh,
-    simplices::Simplex,
-    vtu_output::{Encoding, VTUFile},
-    Cell, Error, Face, Result, Tag, Vertex,
+    io::{Encoding, VTUFile},
+    mesh::{Cell, Face, Mesh, Simplex},
+    Error, Result, Tag, Vertex,
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -640,8 +639,8 @@ fn try_merge_polygons<'a>(polygons: &[&'a [usize]]) -> (Vec<usize>, Vec<&'a [usi
 #[cfg(test)]
 mod tests {
     use crate::{
-        mesh_3d::{box_mesh, Mesh3d},
-        poly_mesh::merge_polygons,
+        dual::merge_polygons,
+        mesh::{box_mesh, Mesh3d},
     };
 
     use super::{merge_polylines, PolyMesh, SimplePolyMesh};

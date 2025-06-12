@@ -1,15 +1,11 @@
 //! Python bindings for dual meshes
+use crate::mesh::{PyBoundaryMesh2d, PyBoundaryMesh3d, PyMesh2d, PyMesh3d};
 use numpy::{PyArray, PyArray1, PyArray2, PyArrayMethods};
 use pyo3::{Bound, PyResult, Python, exceptions::PyRuntimeError, pyclass, pymethods};
 use tmesh::{
     Tag,
-    dual_mesh::{DualMesh, DualType},
-    dual_mesh_2d::DualMesh2d,
-    dual_mesh_3d::DualMesh3d,
-    poly_mesh::PolyMesh,
+    dual::{DualMesh, DualMesh2d, DualMesh3d, DualType, PolyMesh},
 };
-
-use crate::mesh::{PyBoundaryMesh2d, PyBoundaryMesh3d, PyMesh2d, PyMesh3d};
 
 /// Type of dual cells (mapping of `tmesh::DualType`)
 #[pyclass(eq, eq_int)]

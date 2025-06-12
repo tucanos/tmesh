@@ -4,21 +4,64 @@
 //!   - faces of type `Face<F>` and element tags
 //!
 //! F = C-1 cannot be imposed in rust stable
-use crate::hilbert::hilbert_indices;
-use crate::least_squares::LeastSquaresGradient;
-use crate::partition::Partitioner;
-use crate::simplices::{Simplex, EDGE_FACES, TETRA_FACES, TRIANGLE_FACES};
-use crate::split::{split_edgs, split_tets, split_tris};
-use crate::to_simplices::{hex2tets, pri2tets, pyr2tets, qua2tris};
-use crate::vtu_output::{Encoding, VTUFile};
-use crate::{graph::CSRGraph, Cell, Edge, Error, Face, Result, Tag, Vertex};
-use crate::{Hexahedron, Quadrangle};
+mod boundary_mesh_2d;
+mod boundary_mesh_3d;
+mod mesh_2d;
+mod mesh_3d;
+mod simplices;
+mod to_simplices;
+mod twovec;
+
+mod split;
+
+mod hilbert;
+pub mod partition;
+
+pub mod least_squares;
+
+/// Cell
+pub type Cell<const C: usize> = [usize; C];
+/// Face
+pub type Face<const F: usize> = Cell<F>;
+
+/// Hexahedron
+pub type Hexahedron = Cell<8>;
+/// Prism
+pub type Prism = Cell<6>;
+/// Pyramid
+pub type Pyramid = Cell<5>;
+/// Quadrangle
+pub type Quadrangle = Cell<4>;
+
+/// Tetrahedron
+pub type Tetrahedron = Cell<4>;
+/// Triangle
+pub type Triangle = Cell<3>;
+/// Edge
+pub type Edge = Cell<2>;
+/// Node
+pub type Node = Cell<1>;
+
+pub use boundary_mesh_2d::BoundaryMesh2d;
+pub use boundary_mesh_3d::BoundaryMesh3d;
+use hilbert::hilbert_indices;
+use least_squares::LeastSquaresGradient;
+pub use mesh_2d::{nonuniform_rectangle_mesh, rectangle_mesh, Mesh2d};
+pub use mesh_3d::{box_mesh, nonuniform_box_mesh, Mesh3d};
+use partition::Partitioner;
+pub use simplices::{get_face_to_elem, Simplex};
+pub(crate) use simplices::{EDGE_FACES, TETRA_FACES, TRIANGLE_FACES};
+use split::{split_edgs, split_tets, split_tris};
+use to_simplices::{hex2tets, pri2tets, pyr2tets, qua2tris};
+
+use crate::{
+    graph::CSRGraph,
+    io::{Encoding, VTUFile},
+    Error, Result, Tag, Vertex,
+};
 use log::debug;
-use minimeshb::reader::MeshbReader;
-use minimeshb::writer::MeshbWriter;
-use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
-use rand::SeedableRng;
+use minimeshb::{reader::MeshbReader, writer::MeshbWriter};
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
@@ -34,7 +77,7 @@ pub(crate) fn cell_vertex<const D: usize, const N: usize>(
     bcoords.iter().zip(v.iter()).map(|(&w, &&v)| w * v).sum()
 }
 
-pub(crate) fn sort_elem_min_ids<const C: usize, I: ExactSizeIterator<Item = [usize; C]>>(
+pub(crate) fn sort_elem_min_ids<'a, const C: usize, I: ExactSizeIterator<Item = &'a Cell<C>>>(
     elems: I,
 ) -> Vec<usize> {
     let n_elems = elems.len();
@@ -46,7 +89,7 @@ pub(crate) fn sort_elem_min_ids<const C: usize, I: ExactSizeIterator<Item = [usi
 }
 
 /// Compute the maximum and average bandwidth of a connectivity
-pub fn bandwidth<const C: usize, I: ExactSizeIterator<Item = [usize; C]>>(
+pub fn bandwidth<'a, const C: usize, I: ExactSizeIterator<Item = &'a Cell<C>>>(
     elems: I,
 ) -> (usize, f64) {
     let n_elems = elems.len();
@@ -59,6 +102,25 @@ pub fn bandwidth<const C: usize, I: ExactSizeIterator<Item = [usize; C]>>(
     });
     let bmean = bmean as f64 / n_elems as f64;
     (bmax, bmean)
+}
+
+/// Collect elements into a fixed shape
+pub fn collect_elems<
+    'a,
+    const C0: usize,
+    const C1: usize,
+    I: ExactSizeIterator<Item = &'a Cell<C0>>,
+>(
+    elems: I,
+) -> Vec<Cell<C1>> {
+    assert_eq!(C0, C1);
+    let mut res = Vec::with_capacity(elems.len());
+    let mut new = [0; C1];
+    for e in elems {
+        new.copy_from_slice(e);
+        res.push(new);
+    }
+    res
 }
 
 /// D-dimensional mesh containing simplices with C nodes
@@ -332,6 +394,22 @@ where
         CSRGraph::from_edges(e2e.iter())
     }
 
+    /// Fix the mesh
+    ///   - add missing boundary faces
+    ///   - add missing internal faces
+    ///   - fix orientation
+    ///
+    /// and check the valitity
+    #[allow(clippy::type_complexity)]
+    fn fix(&mut self) -> Result<(FxHashMap<Tag, Tag>, FxHashMap<[Tag; 2], Tag>)> {
+        let all_faces = self.compute_faces();
+        let btags = self.tag_boundary_faces(&all_faces);
+        let itags = self.tag_internal_faces(&all_faces);
+        self.fix_orientation(&all_faces);
+        self.check(&all_faces)?;
+        Ok((btags, itags))
+    }
+
     /// Fix the orientation of elements (so that their volume is >0) and of faces
     /// to be oriented outwards (if possible)
     fn fix_orientation(&mut self, all_faces: &FxHashMap<Face<F>, [usize; 3]>) {
@@ -375,7 +453,49 @@ where
         }
     }
 
-    /// Compute the faces that are connected to elements with different tags
+    /// Compute the faces that are connected to only one element and that are not already tagged
+    fn tag_boundary_faces(
+        &mut self,
+        all_faces: &FxHashMap<Face<F>, [usize; 3]>,
+    ) -> FxHashMap<Tag, Tag> {
+        let mut res = FxHashMap::with_hasher(FxBuildHasher);
+
+        let tagged_faces = self
+            .par_faces()
+            .zip(self.par_ftags())
+            .map(|(f, t)| (f.sorted(), t))
+            .collect::<FxHashMap<_, _>>();
+
+        let mut next_tag = self.par_ftags().max().unwrap_or(0) + 1;
+
+        // add untagged boundary faces
+        for (f, &[_, i0, i1]) in all_faces {
+            if i0 == usize::MAX && !tagged_faces.contains_key(f) {
+                let etag = self.etag(i0);
+                if let Some(&tmp) = res.get(&etag) {
+                    self.add_faces(std::iter::once(f).cloned(), std::iter::once(tmp));
+                } else {
+                    res.insert(etag, next_tag);
+                    self.add_faces(std::iter::once(f).cloned(), std::iter::once(next_tag));
+                    next_tag += 1;
+                }
+            }
+            if i1 == usize::MAX && !tagged_faces.contains_key(f) {
+                let etag = self.etag(i1);
+                if let Some(&tmp) = res.get(&etag) {
+                    self.add_faces(std::iter::once(f).cloned(), std::iter::once(tmp));
+                } else {
+                    res.insert(etag, next_tag);
+                    self.add_faces(std::iter::once(f).cloned(), std::iter::once(next_tag));
+                    next_tag += 1;
+                }
+            }
+        }
+
+        res
+    }
+
+    /// Compute the faces that are connected to elements with different tags and that are not already tagged
     fn tag_internal_faces(
         &mut self,
         all_faces: &FxHashMap<Face<F>, [usize; 3]>,
@@ -391,10 +511,10 @@ where
         let mut next_tag = self.par_ftags().max().unwrap_or(0) + 1;
 
         // check tagged internal faces
-        for (f, [_, i0, i1]) in all_faces {
-            if *i0 != usize::MAX && *i1 != usize::MAX {
-                let t0 = self.etag(*i0);
-                let t1 = self.etag(*i1);
+        for (f, &[_, i0, i1]) in all_faces {
+            if i0 != usize::MAX && i1 != usize::MAX {
+                let t0 = self.etag(i0);
+                let t1 = self.etag(i1);
                 if t0 != t1 {
                     if let Some(tag) = tagged_faces.get(f) {
                         let tags = if t0 < t1 { [t0, t1] } else { [t1, t0] };
@@ -407,10 +527,10 @@ where
         }
 
         // add untagged internal faces
-        for (f, [_, i0, i1]) in all_faces {
-            if *i0 != usize::MAX && *i1 != usize::MAX {
-                let t0 = self.etag(*i0);
-                let t1 = self.etag(*i1);
+        for (f, &[_, i0, i1]) in all_faces {
+            if i0 != usize::MAX && i1 != usize::MAX {
+                let t0 = self.etag(i0);
+                let t1 = self.etag(i1);
                 if t0 != t1 && !tagged_faces.contains_key(f) {
                     let tags = if t0 < t1 { [t0, t1] } else { [t1, t0] };
                     if let Some(&tmp) = res.get(&tags) {
@@ -637,10 +757,10 @@ where
         let vert_ids = graph.reverse_cuthill_mckee();
         let mut res = self.reorder_vertices(&vert_ids);
 
-        let elem_ids = sort_elem_min_ids(res.elems().cloned());
+        let elem_ids = sort_elem_min_ids(res.elems());
         res.reorder_elems(&elem_ids);
 
-        let face_ids = sort_elem_min_ids(res.faces().cloned());
+        let face_ids = sort_elem_min_ids(res.faces());
         res.reorder_faces(&face_ids);
 
         (res, vert_ids, elem_ids, face_ids)
@@ -661,10 +781,10 @@ where
         let vert_ids = hilbert_indices(self.verts().cloned());
         let mut res = self.reorder_vertices(&vert_ids);
 
-        let elem_ids = sort_elem_min_ids(res.elems().cloned());
+        let elem_ids = sort_elem_min_ids(res.elems());
         res.reorder_elems(&elem_ids);
 
-        let face_ids = sort_elem_min_ids(res.faces().cloned());
+        let face_ids = sort_elem_min_ids(res.faces());
         res.reorder_faces(&face_ids);
 
         (res, vert_ids, elem_ids, face_ids)

@@ -1,9 +1,8 @@
 use crate::{
+    dual::{merge_polylines, PolyMesh, PolyMeshType},
     extruded::ExtrudedMesh2d,
-    mesh::Mesh,
-    poly_mesh::{merge_polylines, PolyMesh, PolyMeshType},
-    simplices::Simplex,
-    Cell, Face, Prism, Result, Tag, Vertex,
+    mesh::{Cell, Face, Mesh, Prism, Simplex},
+    Result, Tag, Vertex,
 };
 use base64::Engine as _;
 use quick_xml::se::to_utf8_io_writer;
@@ -552,9 +551,8 @@ impl CellData {
 
 #[cfg(test)]
 mod tests {
-    use crate::mesh_2d::{rectangle_mesh, Mesh2d};
-
     use super::{Encoding, VTUFile};
+    use crate::mesh::{rectangle_mesh, Mesh2d};
 
     #[test]
     fn test_write_triangles() {

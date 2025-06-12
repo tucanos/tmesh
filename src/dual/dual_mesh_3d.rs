@@ -1,10 +1,10 @@
 //! Computation of the dual for `Mesh<3, 4, 3>`
+use super::{circumcenter_bcoords, DualCellCenter, DualMesh, DualType, PolyMesh, PolyMeshType};
 use crate::{
-    dual_mesh::{circumcenter_bcoords, DualCellCenter, DualMesh, DualType},
-    mesh::{cell_center, cell_vertex, sort_elem_min_ids, Mesh},
-    poly_mesh::{PolyMesh, PolyMeshType},
-    simplices::Simplex,
-    Edge, Tag, Tetrahedron, Triangle, Vert3d,
+    mesh::{
+        cell_center, cell_vertex, sort_elem_min_ids, Edge, Mesh, Simplex, Tetrahedron, Triangle,
+    },
+    Tag, Vert3d,
 };
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -436,7 +436,7 @@ impl DualMesh<3, 4, 3> for DualMesh3d {
             edges[i_edg] = edg;
         }
 
-        let ids = sort_elem_min_ids(edges.iter().copied());
+        let ids = sort_elem_min_ids(edges.iter());
         let edges = ids
             .iter()
             .filter(|&&i| edge_normals[i].norm() > 1e-12)
@@ -485,12 +485,9 @@ impl DualMesh<3, 4, 3> for DualMesh3d {
 
 #[cfg(test)]
 mod tests {
-    use super::{DualMesh, DualMesh3d};
     use crate::{
-        dual_mesh::DualType,
-        mesh::Mesh,
-        mesh_3d::{box_mesh, Mesh3d},
-        poly_mesh::PolyMesh,
+        dual::{DualMesh, DualMesh3d, DualType, PolyMesh},
+        mesh::{box_mesh, Mesh, Mesh3d},
     };
     use rayon::iter::ParallelIterator;
 

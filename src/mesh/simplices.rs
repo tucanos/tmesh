@@ -1,10 +1,32 @@
 //! Simplex elements
-use crate::{Edge, Node, Tetrahedron, Triangle, Vertex};
+use super::{twovec, Cell, Edge, Face, Node, Tetrahedron, Triangle};
+use crate::Vertex;
+use nalgebra::{SMatrix, SVector};
+use rustc_hash::FxHashMap;
 
 /// Simplex elements
 pub trait Simplex<const C: usize>: Sized {
+    /// Get the number of edges
+    fn n_edges() -> usize {
+        C * (C - 1) / 2
+    }
+
+    /// Get the number of faces
+    fn n_faces() -> usize {
+        C
+    }
+
     /// Get the edges for the simplex `(0, .., C-1)`
     fn edges() -> Vec<Edge>;
+
+    /// Get the i-th edge for the current simplex
+    fn edge(&self, i: usize) -> Edge;
+
+    /// Get the faces for the simplex `(0, .., C-1)`
+    fn faces<const F: usize>() -> Vec<Face<F>>;
+
+    /// Get the i-th face for the current simplex
+    fn face<const F: usize>(&self, i: usize) -> Face<F>;
 
     /// Get the volume of a simplex
     fn vol<const D: usize>(v: [&Vertex<D>; C]) -> f64;
@@ -31,6 +53,9 @@ pub trait Simplex<const C: usize>: Sized {
 
     /// Invert the element
     fn invert(&mut self);
+
+    /// Barycentric coordinates
+    fn bcoords<const D: usize>(ge: [&Vertex<D>; C], v: &Vertex<D>) -> [f64; C];
 }
 
 fn is_circ_perm<const N: usize>(a: &[usize; N], b: &[usize; N]) -> bool {
@@ -48,6 +73,18 @@ fn is_circ_perm<const N: usize>(a: &[usize; N], b: &[usize; N]) -> bool {
 
 impl Simplex<1> for Node {
     fn edges() -> Vec<Edge> {
+        unreachable!()
+    }
+
+    fn edge(&self, _i: usize) -> Edge {
+        unreachable!()
+    }
+
+    fn faces<const F: usize>() -> Vec<Face<F>> {
+        unreachable!()
+    }
+
+    fn face<const F: usize>(&self, _i: usize) -> Face<F> {
         unreachable!()
     }
 
@@ -76,6 +113,10 @@ impl Simplex<1> for Node {
     }
 
     fn invert(&mut self) {}
+
+    fn bcoords<const D: usize>(_ge: [&Vertex<D>; 1], _v: &Vertex<D>) -> [f64; 1] {
+        unreachable!()
+    }
 }
 
 pub(crate) const EDGE_FACES: [Node; 2] = [[0], [1]];
@@ -83,6 +124,27 @@ pub(crate) const EDGE_FACES: [Node; 2] = [[0], [1]];
 impl Simplex<2> for Edge {
     fn edges() -> Vec<Edge> {
         vec![[0, 1]]
+    }
+
+    fn edge(&self, i: usize) -> Edge {
+        match i {
+            0 => [self[0], self[1]],
+            _ => unreachable!(),
+        }
+    }
+
+    fn faces<const F: usize>() -> Vec<Face<F>> {
+        debug_assert_eq!(F, 1);
+        EDGE_FACES
+            .iter()
+            .map(|x| x.as_slice().try_into().unwrap())
+            .collect()
+    }
+
+    fn face<const F: usize>(&self, i: usize) -> Face<F> {
+        debug_assert_eq!(F, 1);
+        let [i0] = EDGE_FACES[i];
+        [self[i0]].as_slice().try_into().unwrap()
     }
 
     fn vol<const D: usize>(v: [&Vertex<D>; 2]) -> f64 {
@@ -124,6 +186,10 @@ impl Simplex<2> for Edge {
     fn invert(&mut self) {
         self.swap(1, 0);
     }
+
+    fn bcoords<const D: usize>(_ge: [&Vertex<D>; 2], _v: &Vertex<D>) -> [f64; 2] {
+        unreachable!()
+    }
 }
 
 pub(crate) const TRIANGLE_FACES: [Edge; 3] = [[0, 1], [1, 2], [2, 0]];
@@ -131,6 +197,29 @@ pub(crate) const TRIANGLE_FACES: [Edge; 3] = [[0, 1], [1, 2], [2, 0]];
 impl Simplex<3> for Triangle {
     fn edges() -> Vec<Edge> {
         vec![[0, 1], [1, 2], [2, 0]]
+    }
+
+    fn edge(&self, i: usize) -> Edge {
+        match i {
+            0 => [self[0], self[1]],
+            1 => [self[1], self[2]],
+            2 => [self[2], self[0]],
+            _ => unreachable!(),
+        }
+    }
+
+    fn faces<const F: usize>() -> Vec<Face<F>> {
+        debug_assert_eq!(F, 2);
+        TRIANGLE_FACES
+            .iter()
+            .map(|x| x.as_slice().try_into().unwrap())
+            .collect()
+    }
+
+    fn face<const F: usize>(&self, i: usize) -> Face<F> {
+        debug_assert_eq!(F, 2);
+        let [i0, i1] = TRIANGLE_FACES[i];
+        [self[i0], self[i1]].as_slice().try_into().unwrap()
     }
 
     fn vol<const D: usize>(v: [&Vertex<D>; 3]) -> f64 {
@@ -186,12 +275,62 @@ impl Simplex<3> for Triangle {
     fn invert(&mut self) {
         self.swap(1, 0);
     }
+
+    fn bcoords<const D: usize>(ge: [&Vertex<D>; 3], v: &Vertex<D>) -> [f64; 3] {
+        if D == 2 {
+            let a = SMatrix::<f64, 3, 3>::new(
+                1.0, 1.0, 1.0, ge[0][0], ge[1][0], ge[2][0], ge[0][1], ge[1][1], ge[2][1],
+            );
+            let b = SVector::<f64, 3>::new(1., v[0], v[1]);
+            let decomp = a.lu();
+            let x = decomp.solve(&b).unwrap();
+            [x[0], x[1], x[2]]
+        } else {
+            let u = ge[1] - ge[0];
+            let v = ge[2] - ge[0];
+            let n = u.cross(&v);
+            let w = v - ge[0];
+            let nrm = n.norm_squared();
+            let gamma = u.cross(&w).dot(&n) / nrm;
+            let beta = w.cross(&v).dot(&n) / nrm;
+            [1.0 - beta - gamma, beta, gamma]
+        }
+    }
 }
 
 pub(crate) const TETRA_FACES: [Triangle; 4] = [[1, 2, 3], [2, 0, 3], [0, 1, 3], [0, 2, 1]];
 impl Simplex<4> for Tetrahedron {
     fn edges() -> Vec<Edge> {
         vec![[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]]
+    }
+
+    fn edge(&self, i: usize) -> Edge {
+        match i {
+            0 => [self[0], self[1]],
+            1 => [self[1], self[2]],
+            2 => [self[2], self[0]],
+            3 => [self[0], self[3]],
+            4 => [self[1], self[3]],
+            5 => [self[2], self[3]],
+            _ => unreachable!(),
+        }
+    }
+
+    fn faces<const F: usize>() -> Vec<Face<F>> {
+        debug_assert_eq!(F, 3);
+        TETRA_FACES
+            .iter()
+            .map(|x| x.as_slice().try_into().unwrap())
+            .collect()
+    }
+
+    fn face<const F: usize>(&self, i: usize) -> Face<F> {
+        debug_assert_eq!(F, 3);
+        let [i0, i1, i2] = TETRA_FACES[i];
+        [self[i0], self[i1], self[i2]]
+            .as_slice()
+            .try_into()
+            .unwrap()
     }
 
     fn vol<const D: usize>(v: [&Vertex<D>; 4]) -> f64 {
@@ -230,4 +369,49 @@ impl Simplex<4> for Tetrahedron {
     fn is_same(&self, other: &Self) -> bool {
         is_circ_perm(self, other)
     }
+
+    fn invert(&mut self) {
+        self.swap(1, 0);
+    }
+
+    fn bcoords<const D: usize>(ge: [&Vertex<D>; 4], v: &Vertex<D>) -> [f64; 4] {
+        let a = SMatrix::<f64, 4, 4>::new(
+            1.0, 1.0, 1.0, 1.0, ge[0][0], ge[1][0], ge[2][0], ge[3][0], ge[0][1], ge[1][1],
+            ge[2][1], ge[3][1], ge[0][2], ge[1][2], ge[2][2], ge[3][2],
+        );
+        let b = SVector::<f64, 4>::new(1., v[0], v[1], v[2]);
+        let decomp = a.lu();
+        let x = decomp.solve(&b).unwrap();
+        [x[0], x[1], x[2], x[3]]
+    }
+}
+
+/// Compute a `FxHashMap` that maps face-to-vertex connectivity (sorted) to a vector of element indices
+#[must_use]
+pub fn get_face_to_elem<
+    'a,
+    const C: usize,
+    const F: usize,
+    I: ExactSizeIterator<Item = &'a Cell<C>>,
+>(
+    elems: I,
+) -> FxHashMap<Face<F>, twovec::Vec<usize>>
+where
+    Cell<C>: Simplex<C>,
+{
+    let mut map: FxHashMap<Face<F>, twovec::Vec<usize>> = FxHashMap::default();
+    for (i_elem, elem) in elems.enumerate() {
+        for i_face in 0..Cell::<C>::n_faces() {
+            let mut f = elem.face(i_face);
+            f.sort();
+            let n = map.get_mut(&f);
+            if let Some(n) = n {
+                n.push(i_elem);
+            } else {
+                map.insert(f, twovec::Vec::with_single(i_elem));
+            }
+        }
+    }
+
+    map
 }

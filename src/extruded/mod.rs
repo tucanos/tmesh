@@ -1,11 +1,9 @@
 //! Extrude 2d triangle meshes to 3d as 1 layer of prisms
 use crate::{
-    dual_mesh_2d::DualMesh2d,
-    mesh::Mesh,
-    mesh_2d::Mesh2d,
-    poly_mesh::{merge_polylines, PolyMesh, PolyMeshType, SimplePolyMesh},
-    vtu_output::{Encoding, VTUFile},
-    Error, Prism, Quadrangle, Result, Tag, Triangle, Vert2d, Vert3d,
+    dual::{merge_polylines, DualMesh2d, PolyMesh, PolyMeshType, SimplePolyMesh},
+    io::{Encoding, VTUFile},
+    mesh::{Mesh, Mesh2d, Prism, Quadrangle, Triangle},
+    Error, Result, Tag, Vert2d, Vert3d,
 };
 
 /// Extrusion of a `Mesh2d` along `z`
@@ -237,11 +235,8 @@ impl DualMesh2d {
 #[cfg(test)]
 mod tests {
     use crate::{
-        dual_mesh::DualMesh,
-        dual_mesh_2d::DualMesh2d,
-        mesh::Mesh,
-        mesh_2d::{rectangle_mesh, Mesh2d},
-        // poly_mesh::PolyMesh,
+        dual::{DualMesh, DualMesh2d, DualType},
+        mesh::{rectangle_mesh, Mesh, Mesh2d},
     };
 
     use super::ExtrudedMesh2d;
@@ -259,7 +254,7 @@ mod tests {
     #[test]
     fn test_extrude_dual() {
         let msh = rectangle_mesh::<Mesh2d>(1.0, 10, 2.0, 15);
-        let dual = DualMesh2d::new(&msh, crate::dual_mesh::DualType::Median);
+        let dual = DualMesh2d::new(&msh, DualType::Median);
         let _extruded = dual.extrude(1.0);
         // extruded.write_vtk("extruded_self.vtu").unwrap();
     }

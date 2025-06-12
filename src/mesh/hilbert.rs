@@ -1,6 +1,5 @@
-use lindel::Lineariseable;
-
 use crate::Vertex;
+use lindel::Lineariseable;
 
 /// Get the bounding box
 #[must_use]

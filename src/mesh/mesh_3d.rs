@@ -1,7 +1,7 @@
 //! Tetrahedron meshes in 3d
+use super::{Mesh, Tetrahedron, Triangle};
+use crate::{Tag, Vert3d};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-
-use crate::{mesh::Mesh, Tag, Tetrahedron, Triangle, Vert3d};
 
 /// Create a `Mesh<3, 4, 3>` of a `lx` by `ly` by `lz` box by splitting a `nx` by `ny` by `nz`
 /// uniform structured grid
@@ -324,12 +324,12 @@ impl Mesh<3, 4, 3> for Mesh3d {
 mod tests {
     use crate::{
         assert_delta,
-        boundary_mesh_3d::BoundaryMesh3d,
-        mesh::{bandwidth, cell_center, Mesh},
-        mesh_3d::{box_mesh, Mesh3d},
-        partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
-        simplices::Simplex,
-        Tetrahedron, Triangle, Vert3d,
+        mesh::{
+            bandwidth, box_mesh, cell_center,
+            partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
+            BoundaryMesh3d, Mesh, Mesh3d, Simplex, Tetrahedron, Triangle,
+        },
+        Vert3d,
     };
     use rayon::iter::ParallelIterator;
 
@@ -405,11 +405,11 @@ mod tests {
     #[test]
     fn test_rcm() {
         let msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
-        let avg_bandwidth = bandwidth(msh.elems().cloned()).1;
+        let avg_bandwidth = bandwidth(msh.elems()).1;
         assert!(avg_bandwidth > 1000.0);
 
         let (msh_rcm, vert_ids, elem_ids, face_ids) = msh.reorder_rcm();
-        let avg_bandwidth_rcm = bandwidth(msh_rcm.elems().cloned()).1;
+        let avg_bandwidth_rcm = bandwidth(msh_rcm.elems()).1;
 
         assert!(avg_bandwidth_rcm < 320.0);
 
@@ -467,11 +467,11 @@ mod tests {
     #[test]
     fn test_hilbert() {
         let msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
-        let avg_bandwidth = bandwidth(msh.elems().cloned()).1;
+        let avg_bandwidth = bandwidth(msh.elems()).1;
         assert!(avg_bandwidth > 1000.0);
 
         let (msh_hilbert, vert_ids, elem_ids, face_ids) = msh.reorder_hilbert();
-        let avg_bandwidth_hilbert = bandwidth(msh_hilbert.elems().cloned()).1;
+        let avg_bandwidth_hilbert = bandwidth(msh_hilbert.elems()).1;
         assert!(avg_bandwidth_hilbert < 440.0);
 
         for (i, v) in msh_hilbert.verts().enumerate() {

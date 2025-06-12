@@ -1,12 +1,8 @@
 //! Dual meshes in 2d
 use std::{path::Path, process::Command};
 use tmesh::{
-    boundary_mesh_2d::BoundaryMesh2d,
-    dual_mesh::{DualMesh, DualType},
-    dual_mesh_2d::DualMesh2d,
-    mesh::Mesh,
-    mesh_2d::Mesh2d,
-    poly_mesh::{PolyMesh, SimplePolyMesh},
+    dual::{DualMesh, DualMesh2d, DualType, PolyMesh, SimplePolyMesh},
+    mesh::{BoundaryMesh2d, Mesh, Mesh2d},
     Result,
 };
 

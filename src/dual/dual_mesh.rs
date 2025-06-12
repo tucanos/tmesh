@@ -6,11 +6,10 @@
 //!
 //! and an explicit polygonal meshes (`PolyMesh<D>, where all the faces are of type `Face<F>`)
 //! are built
+use super::PolyMesh;
 use crate::{
-    mesh::{cell_center, Mesh},
-    poly_mesh::PolyMesh,
-    simplices::Simplex,
-    Cell, Error, Face, Result, Tag, Vertex,
+    mesh::{cell_center, Cell, Face, Mesh, Simplex},
+    Error, Result, Tag, Vertex,
 };
 use nalgebra::{DMatrix, DVector};
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -344,7 +343,7 @@ pub fn circumcenter_bcoords<const D: usize, const C: usize>(v: [&Vertex<D>; C]) 
 
 #[cfg(test)]
 mod tests {
-    use crate::{assert_delta, dual_mesh::circumcenter_bcoords, mesh::cell_vertex, Vert2d, Vert3d};
+    use crate::{assert_delta, dual::circumcenter_bcoords, mesh::cell_vertex, Vert2d, Vert3d};
     use rand::{rngs::StdRng, Rng, SeedableRng};
 
     #[test]

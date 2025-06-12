@@ -1,4 +1,4 @@
-use crate::{Tetrahedron, Triangle};
+use super::{Tetrahedron, Triangle};
 
 // Subdivision of standard elements to triangles and tetrahedra maintaining a consistent mesh. The algorithms are taken from
 // How to Subdivide Pyramids, Prisms and Hexahedra into Tetrahedra

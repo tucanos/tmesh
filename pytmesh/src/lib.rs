@@ -1,9 +1,9 @@
 //! Python bindings for tmesh
 
-pub mod dual;
-pub mod extruded;
-pub mod mesh;
-pub mod poly;
+mod dual;
+mod extruded;
+mod mesh;
+mod poly;
 
 use pyo3::{
     Bound, PyResult, Python, pymodule,

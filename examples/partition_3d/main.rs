@@ -1,12 +1,12 @@
 //! Mesh partition example
 use std::{path::Path, process::Command, time::Instant};
 #[cfg(feature = "metis")]
-use tmesh::partition::{MetisKWay, MetisPartitioner, MetisRecursive};
+use tmesh::mesh::partition::{MetisKWay, MetisPartitioner, MetisRecursive};
 use tmesh::{
-    boundary_mesh_3d::BoundaryMesh3d,
-    mesh::Mesh,
-    mesh_3d::Mesh3d,
-    partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
+    mesh::{
+        partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
+        BoundaryMesh3d, Mesh, Mesh3d,
+    },
     Result,
 };
 

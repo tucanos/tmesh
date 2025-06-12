@@ -10,15 +10,15 @@ use pyo3::{
     types::PyType,
 };
 #[cfg(feature = "metis")]
-use tmesh::partition::{MetisKWay, MetisPartitioner, MetisRecursive};
+use tmesh::mesh::partition::{MetisKWay, MetisPartitioner, MetisRecursive};
 use tmesh::{
     Tag, Vertex,
-    boundary_mesh_2d::BoundaryMesh2d,
-    boundary_mesh_3d::BoundaryMesh3d,
-    mesh::Mesh,
-    mesh_2d::{Mesh2d, nonuniform_rectangle_mesh},
-    mesh_3d::{Mesh3d, nonuniform_box_mesh},
-    partition::{HilbertPartitioner, KMeansPartitioner2d, KMeansPartitioner3d, RCMPartitioner},
+    interpolate::{InterpolationMethod, Interpolator},
+    mesh::{
+        BoundaryMesh2d, BoundaryMesh3d, Mesh, Mesh2d, Mesh3d, nonuniform_box_mesh,
+        nonuniform_rectangle_mesh,
+        partition::{HilbertPartitioner, KMeansPartitioner2d, KMeansPartitioner3d, RCMPartitioner},
+    },
 };
 
 /// Partitionner type
@@ -28,6 +28,7 @@ pub enum PyPartitionerType {
     /// Hilbert
     Hilbert,
     /// RCM
+    #[allow(clippy::upper_case_acronyms)]
     RCM,
     /// KMeans
     KMeans,
@@ -363,6 +364,44 @@ macro_rules! create_mesh {
             fn split(&self) -> Self {
                 let msh = self.0.split();
                 Self(msh)
+            }
+
+            /// Split and add prisms
+            #[pyo3(signature = (data, verts, tol=1e-3, nearest=false))]
+            fn interpolate<'py>(
+                &mut self,
+                py: Python<'py>,
+                data: PyReadonlyArray2<f64>,
+                verts: PyReadonlyArray2<f64>,
+                tol: f64,
+                nearest: bool,
+            ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+                if data.shape()[0] != self.0.n_verts() {
+                    return Err(PyValueError::new_err("Invalid dimension 0 for data"));
+                }
+                let m = data.shape()[1];
+
+                if verts.shape()[1] != $dim {
+                    return Err(PyValueError::new_err("Invalid dimension 1 for verts"));
+                }
+
+                let method = if nearest {
+                    InterpolationMethod::Nearest
+                } else {
+                    InterpolationMethod::Linear(tol)
+                };
+
+                let interp = Interpolator::new(&self.0, method);
+
+                let res = interp.interpolate(
+                    data.as_slice()?,
+                    verts
+                        .as_slice()?
+                        .chunks($dim)
+                        .map(|x| Vertex::<$dim>::from_column_slice(x)),
+                );
+
+                PyArray::from_vec(py, res).reshape([verts.shape()[0], m])
             }
         }
     };

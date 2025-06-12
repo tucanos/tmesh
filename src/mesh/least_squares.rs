@@ -1,6 +1,9 @@
+//! Weighted least square gradient computation
+
 use crate::{Error, Result};
 use nalgebra::{Const, DMatrix, DVector, Dyn, OMatrix, SVector, QR};
 
+/// Weighted least square gradient computation
 pub struct LeastSquaresGradient<const D: usize> {
     qr: QR<f64, Dyn, Dyn>,
     r: DMatrix<f64>,
@@ -8,6 +11,7 @@ pub struct LeastSquaresGradient<const D: usize> {
 }
 
 impl<const D: usize> LeastSquaresGradient<D> {
+    /// Initialize the WLS computation
     pub fn new<I: ExactSizeIterator<Item = SVector<f64, D>>>(
         weight_exp: i32,
         dx: I,
@@ -52,6 +56,7 @@ impl<const D: usize> LeastSquaresGradient<D> {
         }
     }
 
+    /// Compute the gradient
     pub fn gradient<I: ExactSizeIterator<Item = f64>>(&self, df: I) -> SVector<f64, D> {
         assert_eq!(df.len(), self.weights.len());
         let mut rhs = DVector::<f64>::zeros(df.len() + 1);
@@ -68,6 +73,7 @@ impl<const D: usize> LeastSquaresGradient<D> {
         rhs.fixed_view::<D, 1>(1, 0).into()
     }
 
+    /// Compute the gradient weights
     #[allow(dead_code)]
     pub fn gradient_weights(&self) -> impl ExactSizeIterator<Item = SVector<f64, D>> + '_ {
         let mut rhs = DMatrix::<f64>::zeros(self.weights.len() + 1, 1);

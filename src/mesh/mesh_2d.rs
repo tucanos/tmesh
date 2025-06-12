@@ -1,7 +1,7 @@
 //! Triangle meshes in 2d
+use super::{Edge, Mesh, Triangle};
+use crate::{Tag, Vert2d};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-
-use crate::{mesh::Mesh, Edge, Tag, Triangle, Vert2d};
 
 /// Create a `Mesh<2, 3, 2>` of a `lx` by `ly` rectangle by splitting a `nx` by `ny`
 /// uniform structured grid
@@ -255,11 +255,11 @@ impl Mesh<2, 3, 2> for Mesh2d {
 mod tests {
     use crate::{
         assert_delta,
-        boundary_mesh_2d::BoundaryMesh2d,
-        mesh::{bandwidth, cell_center, Mesh},
-        mesh_2d::{rectangle_mesh, Mesh2d},
-        simplices::Simplex,
-        Edge, Triangle, Vert2d,
+        mesh::{
+            bandwidth, cell_center, rectangle_mesh, BoundaryMesh2d, Edge, Mesh, Mesh2d, Simplex,
+            Triangle,
+        },
+        Vert2d,
     };
     use rayon::iter::ParallelIterator;
 
@@ -381,11 +381,11 @@ mod tests {
     #[test]
     fn test_rcm() {
         let msh = rectangle_mesh::<Mesh2d>(1.0, 100, 1.0, 100).random_shuffle();
-        let avg_bandwidth = bandwidth(msh.elems().cloned()).1;
+        let avg_bandwidth = bandwidth(msh.elems()).1;
         assert!(avg_bandwidth > 1000.0);
 
         let (msh_rcm, vert_ids, elem_ids, face_ids) = msh.reorder_rcm();
-        let avg_bandwidth_rcm = bandwidth(msh_rcm.elems().cloned()).1;
+        let avg_bandwidth_rcm = bandwidth(msh_rcm.elems()).1;
 
         assert!(avg_bandwidth_rcm < 80.0);
 

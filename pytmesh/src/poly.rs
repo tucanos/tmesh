@@ -10,7 +10,7 @@ use pyo3::{
 };
 use tmesh::{
     Tag, Vertex,
-    poly_mesh::{PolyMesh, PolyMeshType, SimplePolyMesh},
+    dual::{PolyMesh, PolyMeshType, SimplePolyMesh},
 };
 
 /// Type of poly cells (mapping of `tmesh::PolyMeshType`)
