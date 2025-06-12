@@ -1,6 +1,8 @@
 //! Boundary of `Mesh3d`
 use std::fs::OpenOptions;
 
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+
 use crate::{mesh::Mesh, Edge, Result, Tag, Triangle, Vert3d};
 
 /// Triangle mesh in 3d
@@ -71,6 +73,20 @@ impl Mesh<3, 3, 2> for BoundaryMesh3d {
         &self.verts[i]
     }
 
+    fn verts(&self) -> impl ExactSizeIterator<Item = &Vert3d> + Clone + '_ {
+        self.verts.iter()
+    }
+
+    fn verts_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Vert3d> + '_ {
+        self.verts.iter_mut()
+    }
+
+    fn par_verts(
+        &self,
+    ) -> impl rayon::prelude::IndexedParallelIterator<Item = &Vert3d> + Clone + '_ {
+        self.verts.par_iter()
+    }
+
     fn add_verts<I: ExactSizeIterator<Item = Vert3d>>(&mut self, v: I) {
         self.verts.extend(v);
     }
@@ -83,12 +99,32 @@ impl Mesh<3, 3, 2> for BoundaryMesh3d {
         &self.elems[i]
     }
 
+    fn elems(&self) -> impl ExactSizeIterator<Item = &Triangle> + Clone + '_ {
+        self.elems.iter()
+    }
+
+    fn elems_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Triangle> + '_ {
+        self.elems.iter_mut()
+    }
+
+    fn par_elems(&self) -> impl IndexedParallelIterator<Item = &Triangle> + Clone + '_ {
+        self.elems.par_iter()
+    }
+
     fn etag(&self, i: usize) -> Tag {
         self.etags[i]
     }
 
-    fn mut_etag(&mut self, i: usize) -> &mut Tag {
-        &mut self.etags[i]
+    fn etags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_ {
+        self.etags.iter().cloned()
+    }
+
+    fn etags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_ {
+        self.etags.iter_mut()
+    }
+
+    fn par_etags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
+        self.etags.par_iter().cloned()
     }
 
     fn add_elems<I1: ExactSizeIterator<Item = Triangle>, I2: ExactSizeIterator<Item = Tag>>(
@@ -117,11 +153,6 @@ impl Mesh<3, 3, 2> for BoundaryMesh3d {
         }
     }
 
-    fn invert_elem(&mut self, i: usize) {
-        let e = self.elems[i];
-        self.elems[i] = [e[1], e[0], e[2]];
-    }
-
     fn n_faces(&self) -> usize {
         self.faces.len()
     }
@@ -130,12 +161,32 @@ impl Mesh<3, 3, 2> for BoundaryMesh3d {
         &self.faces[i]
     }
 
+    fn faces(&self) -> impl ExactSizeIterator<Item = &Edge> + Clone + '_ {
+        self.faces.iter()
+    }
+
+    fn faces_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Edge> + '_ {
+        self.faces.iter_mut()
+    }
+
+    fn par_faces(&self) -> impl IndexedParallelIterator<Item = &Edge> + Clone + '_ {
+        self.faces.par_iter()
+    }
+
     fn ftag(&self, i: usize) -> Tag {
         self.ftags[i]
     }
 
-    fn mut_ftag(&mut self, i: usize) -> &mut Tag {
-        &mut self.ftags[i]
+    fn ftags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_ {
+        self.ftags.iter().cloned()
+    }
+
+    fn ftags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_ {
+        self.ftags.iter_mut()
+    }
+
+    fn par_ftags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
+        self.ftags.par_iter().cloned()
     }
 
     fn add_faces<I1: ExactSizeIterator<Item = Edge>, I2: ExactSizeIterator<Item = Tag>>(
@@ -159,10 +210,6 @@ impl Mesh<3, 3, 2> for BoundaryMesh3d {
             self.faces.push(e);
             self.ftags.push(t);
         }
-    }
-
-    fn invert_face(&mut self, _i: usize) {
-        unreachable!("No normal for BoundaryMesh3d")
     }
 }
 

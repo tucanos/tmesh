@@ -28,6 +28,9 @@ pub trait Simplex<const C: usize>: Sized {
 
     /// Check of two elements are the same (allowing circular permutation)
     fn is_same(&self, other: &Self) -> bool;
+
+    /// Invert the element
+    fn invert(&mut self);
 }
 
 fn is_circ_perm<const N: usize>(a: &[usize; N], b: &[usize; N]) -> bool {
@@ -71,6 +74,8 @@ impl Simplex<1> for Node {
     fn is_same(&self, other: &Self) -> bool {
         self[0] == other[0]
     }
+
+    fn invert(&mut self) {}
 }
 
 pub(crate) const EDGE_FACES: [Node; 2] = [[0], [1]];
@@ -114,6 +119,10 @@ impl Simplex<2> for Edge {
 
     fn is_same(&self, other: &Self) -> bool {
         is_circ_perm(self, other)
+    }
+
+    fn invert(&mut self) {
+        self.swap(1, 0);
     }
 }
 
@@ -172,6 +181,10 @@ impl Simplex<3> for Triangle {
 
     fn is_same(&self, other: &Self) -> bool {
         is_circ_perm(self, other)
+    }
+
+    fn invert(&mut self) {
+        self.swap(1, 0);
     }
 }
 

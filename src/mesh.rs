@@ -98,14 +98,13 @@ where
     fn vert(&self, i: usize) -> &Vertex<D>;
 
     /// Parallel iterator over the vertices
-    fn par_verts(&self) -> impl IndexedParallelIterator<Item = &Vertex<D>> + Clone + '_ {
-        (0..self.n_verts()).into_par_iter().map(|i| self.vert(i))
-    }
+    fn par_verts(&self) -> impl IndexedParallelIterator<Item = &Vertex<D>> + Clone + '_;
 
     /// Sequential iterator over the vertices
-    fn verts(&self) -> impl ExactSizeIterator<Item = &Vertex<D>> + Clone + '_ {
-        (0..self.n_verts()).map(|i| self.vert(i))
-    }
+    fn verts(&self) -> impl ExactSizeIterator<Item = &Vertex<D>> + Clone + '_;
+
+    /// Sequential iterator over the vertices
+    fn verts_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Vertex<D>> + '_;
 
     /// Add vertices to the mesh
     fn add_verts<I: ExactSizeIterator<Item = Vertex<D>>>(&mut self, v: I);
@@ -117,14 +116,13 @@ where
     fn elem(&self, i: usize) -> &Cell<C>;
 
     /// Parallel iterator over the mesh elements
-    fn par_elems(&self) -> impl IndexedParallelIterator<Item = &Cell<C>> + Clone + '_ {
-        (0..self.n_elems()).into_par_iter().map(|i| self.elem(i))
-    }
+    fn par_elems(&self) -> impl IndexedParallelIterator<Item = &Cell<C>> + Clone + '_;
 
     /// Sequential iterator over the mesh elements
-    fn elems(&self) -> impl ExactSizeIterator<Item = &Cell<C>> + Clone + '_ {
-        (0..self.n_elems()).map(|i| self.elem(i))
-    }
+    fn elems(&self) -> impl ExactSizeIterator<Item = &Cell<C>> + Clone + '_;
+
+    /// Sequential iterator over the mesh elements
+    fn elems_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Cell<C>> + '_;
 
     /// Add elements to the mesh
     fn add_elems<I1: ExactSizeIterator<Item = Cell<C>>, I2: ExactSizeIterator<Item = Tag>>(
@@ -142,24 +140,17 @@ where
         elems_and_tags: I,
     );
 
-    /// Invert the `i`th element
-    fn invert_elem(&mut self, i: usize);
-
     /// Get the tag of the `i`th element
     fn etag(&self, i: usize) -> Tag;
 
-    /// Get the tag of the `i`th element
-    fn mut_etag(&mut self, i: usize) -> &mut Tag;
-
     /// Parallel iterator over the element tags
-    fn par_etags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
-        (0..self.n_elems()).into_par_iter().map(|i| self.etag(i))
-    }
+    fn par_etags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_;
 
     /// Sequential iterator over the element tags
-    fn etags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_ {
-        (0..self.n_elems()).map(|i| self.etag(i))
-    }
+    fn etags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_;
+
+    /// Sequential iterator over the element tags
+    fn etags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_;
 
     /// Get the vertices of element `e`
     fn gelem(&self, e: &Cell<C>) -> [&Vertex<D>; C] {
@@ -188,14 +179,13 @@ where
     fn face(&self, i: usize) -> &Face<F>;
 
     /// Parallel iterator over the faces
-    fn par_faces(&self) -> impl IndexedParallelIterator<Item = &Face<F>> + Clone + '_ {
-        (0..self.n_faces()).into_par_iter().map(|i| self.face(i))
-    }
+    fn par_faces(&self) -> impl IndexedParallelIterator<Item = &Face<F>> + Clone + '_;
 
     /// Sequential itertor over the faces
-    fn faces(&self) -> impl ExactSizeIterator<Item = &Face<F>> + Clone + '_ {
-        (0..self.n_faces()).map(|i| self.face(i))
-    }
+    fn faces(&self) -> impl ExactSizeIterator<Item = &Face<F>> + Clone + '_;
+
+    /// Sequential itertor over the faces
+    fn faces_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Face<F>> + '_;
 
     /// Add faces to the mesh
     fn add_faces<I1: ExactSizeIterator<Item = Face<F>>, I2: ExactSizeIterator<Item = Tag>>(
@@ -213,24 +203,17 @@ where
         faces_and_tags: I,
     );
 
-    /// Invert the `i`th face
-    fn invert_face(&mut self, i: usize);
-
     /// Get the tag of the `i`th face
     fn ftag(&self, i: usize) -> Tag;
 
-    /// Get the tag of the `i`th face
-    fn mut_ftag(&mut self, i: usize) -> &mut Tag;
-
     /// Parallel iterator over the mesh faces
-    fn par_ftags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
-        (0..self.n_faces()).into_par_iter().map(|i| self.ftag(i))
-    }
+    fn par_ftags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_;
 
     /// Sequential iterator over the mesh faces
-    fn ftags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_ {
-        (0..self.n_faces()).map(|i| self.ftag(i))
-    }
+    fn ftags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_;
+
+    /// Sequential iterator over the mesh faces
+    fn ftags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_;
 
     /// Get the vertices of face `f`
     fn gface(&self, f: &Face<F>) -> [&Vertex<D>; F] {
@@ -352,40 +335,41 @@ where
     /// Fix the orientation of elements (so that their volume is >0) and of faces
     /// to be oriented outwards (if possible)
     fn fix_orientation(&mut self, all_faces: &FxHashMap<Face<F>, [usize; 3]>) {
-        let flg: Vec<_> = self
-            .par_elems()
+        let flg = self
+            .elems()
             .map(|e| Cell::<C>::vol(self.gelem(e)) < 0.0)
-            .collect();
-        flg.iter()
-            .enumerate()
-            .filter(|(_, &f)| f)
-            .for_each(|(i, _)| self.invert_elem(i));
+            .collect::<Vec<_>>();
+        let n = self
+            .elems_mut()
+            .zip(flg.iter())
+            .filter(|&(_, x)| *x)
+            .map(|(f, _)| f.invert())
+            .count();
+        debug!("{n} elements reoriented");
 
         if Self::faces_are_oriented() {
-            let flg: Vec<_> = self
-                .par_faces()
+            let flg = self
+                .faces()
                 .map(|f| {
                     let gf = self.gface(f);
                     let fc = cell_center(gf);
-                    let n = Face::<F>::normal(gf);
+                    let normal = Face::<F>::normal(gf);
 
-                    let f = f.sorted();
-                    let [_, i0, i1] = all_faces.get(&f).unwrap();
+                    let [_, i0, i1] = all_faces.get(&f.sorted()).unwrap();
                     assert!(*i0 == usize::MAX || *i1 == usize::MAX);
                     let i = if *i1 == usize::MAX { *i0 } else { *i1 };
                     let ge = self.gelem(self.elem(i));
                     let ec = cell_center(ge);
 
-                    n.dot(&(fc - ec)) < 0.0
+                    normal.dot(&(fc - ec)) < 0.0
                 })
-                .collect();
-            let n = flg
-                .iter()
-                .enumerate()
-                .filter(|(_, &f)| f)
-                .map(|(i, _)| {
-                    self.invert_face(i);
-                })
+                .collect::<Vec<_>>();
+
+            let n = self
+                .faces_mut()
+                .zip(flg.iter())
+                .filter(|&(_, x)| *x)
+                .map(|(f, _)| f.invert())
                 .count();
             debug!("{n} faces reoriented");
         }
@@ -665,10 +649,9 @@ where
     /// Set the partition as etags from an usize slice
     fn set_partition(&mut self, part: &[usize]) {
         assert_eq!(self.n_elems(), part.len());
-        (0..part.len()).for_each(|i| {
-            assert!(part[i] < Tag::MAX as usize - 1);
-            *self.mut_etag(i) = part[i] as Tag + 1;
-        });
+        self.etags_mut()
+            .zip(part.iter())
+            .for_each(|(t0, t1)| *t0 = *t1 as Tag);
     }
 
     /// Reorder the mesh (Hilbert):
