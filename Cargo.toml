@@ -6,11 +6,14 @@ edition = "2021"
 [dependencies]
 base64 = "0.22.1"
 coupe = { git = "https://github.com/tucanos/coupe.git", version = "0.1.0", branch="xg/dev" }
+kdtree = "0.7.0"
 lindel = "0.1.1"
 log = "0.4.27"
 metis = { git = "https://github.com/tucanos/metis-rs.git", rev = "d31aa3e", optional=true}
 minimeshb = { git = "https://github.com/tucanos/minimeshb.git", version = "0.1.0" }
 nalgebra = { version = "0.33.2"}
+parry2d-f64 = "0.21.1"
+parry3d-f64 = "0.21.1"
 quick-xml = { version = "0.37.4", features = ["serialize"] }
 rand = "0.9.0"
 rayon = "1.10.0"

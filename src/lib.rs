@@ -5,8 +5,10 @@ use nalgebra::SVector;
 pub mod dual;
 pub mod extruded;
 pub mod graph;
+pub mod interpolate;
 pub mod io;
 pub mod mesh;
+pub mod spatialindex;
 
 /// Result
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

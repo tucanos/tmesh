@@ -209,3 +209,27 @@ endsolid exported"""
 
         msh = BoundaryMesh3d.read_stl("cube.stl")
         self.assertEqual(msh.n_elems(), 12)
+
+    def test_interpolate_3d(self):
+        nx = 10
+        ny = 15
+        nz = 20
+        msh = Mesh3d.box_mesh(
+            np.linspace(0, 1, nx), np.linspace(0, 2, ny), np.linspace(0, 3, nz)
+        )
+
+        x, y, z = msh.get_verts().T
+        f = np.vstack([1 + 2 * x + 3 * y + 4 * z, 2 + 3 * x + 4 * y + 5 * z]).T.copy()
+
+        msh2 = Mesh3d.box_mesh(
+            np.linspace(0.2, 0.5, nx),
+            np.linspace(0.2, 0.6, ny),
+            np.linspace(0.3, 0.7, nz),
+        )
+
+        f2 = msh.interpolate(f, msh2.get_verts())
+
+        x, y, z = msh2.get_verts().T
+        f3 = np.vstack([1 + 2 * x + 3 * y + 4 * z, 2 + 3 * x + 4 * y + 5 * z]).T
+
+        self.assertTrue(np.allclose(f2, f3))
