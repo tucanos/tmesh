@@ -1,6 +1,6 @@
 //! General polyline, polygon and polyhedral meshes
 use crate::{
-    io::{Encoding, VTUFile},
+    io::{VTUEncoding, VTUFile},
     mesh::{Cell, Face, Mesh, Simplex},
     Error, Result, Tag, Vertex,
 };
@@ -30,15 +30,15 @@ pub trait PolyMesh<const D: usize>: Sync + Sized {
     fn n_verts(&self) -> usize;
 
     /// Get the `i`th vertex
-    fn vert(&self, i: usize) -> &Vertex<D>;
+    fn vert(&self, i: usize) -> Vertex<D>;
 
     /// Parallel iterator over the mesh vertices
-    fn par_verts(&self) -> impl IndexedParallelIterator<Item = &Vertex<D>> + Clone + '_ {
+    fn par_verts(&self) -> impl IndexedParallelIterator<Item = Vertex<D>> + Clone + '_ {
         (0..self.n_verts()).into_par_iter().map(|i| self.vert(i))
     }
 
     /// Sequential iterator over the mesh vertices
-    fn verts(&self) -> impl ExactSizeIterator<Item = &Vertex<D>> + Clone + '_ {
+    fn verts(&self) -> impl ExactSizeIterator<Item = Vertex<D>> + Clone + '_ {
         (0..self.n_verts()).map(|i| self.vert(i))
     }
 
@@ -113,7 +113,7 @@ pub trait PolyMesh<const D: usize>: Sync + Sized {
 
     /// Export the mesh to a `.vtu` file
     fn write_vtk(&self, file_name: &str) -> Result<()> {
-        let vtu = VTUFile::from_poly_mesh(self, Encoding::Ascii);
+        let vtu = VTUFile::from_poly_mesh(self, VTUEncoding::Ascii);
 
         vtu.export(file_name)?;
 
@@ -327,13 +327,13 @@ impl<const D: usize> SimplePolyMesh<D> {
 
         let mut res = Self {
             poly_type: mesh.poly_type(),
-            verts: mesh.par_verts().cloned().collect(),
+            verts: mesh.verts().collect(),
             face_to_node_ptr: new_faces_ptr,
             face_to_node: new_faces,
             ftags: new_ftags,
             elem_to_face_ptr: new_elems_ptr,
             elem_to_face: new_elems,
-            etags: mesh.par_etags().collect(),
+            etags: mesh.etags().collect(),
         };
 
         // unused vertices
@@ -344,7 +344,7 @@ impl<const D: usize> SimplePolyMesh<D> {
             for &i in face {
                 if new_ids[i] == usize::MAX {
                     new_ids[i] = next;
-                    new_verts.push(*mesh.vert(i));
+                    new_verts.push(mesh.vert(i));
                     next += 1;
                 }
             }
@@ -367,7 +367,7 @@ impl<const D: usize> SimplePolyMesh<D> {
             2 => PolyMeshType::Polylines,
             _ => unimplemented!(),
         };
-        let all_faces = mesh.compute_faces();
+        let all_faces = mesh.all_faces();
         let tagged_faces = mesh
             .par_faces()
             .zip(mesh.par_ftags())
@@ -428,7 +428,7 @@ impl<const D: usize> SimplePolyMesh<D> {
 
         Self {
             poly_type,
-            verts: mesh.par_verts().cloned().collect(),
+            verts: mesh.par_verts().collect(),
             face_to_node_ptr,
             face_to_node,
             ftags,
@@ -448,8 +448,8 @@ impl<const D: usize> PolyMesh<D> for SimplePolyMesh<D> {
         self.verts.len()
     }
 
-    fn vert(&self, i: usize) -> &Vertex<D> {
-        &self.verts[i]
+    fn vert(&self, i: usize) -> Vertex<D> {
+        self.verts[i]
     }
 
     fn n_elems(&self) -> usize {

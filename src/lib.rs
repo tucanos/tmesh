@@ -10,6 +10,8 @@ pub mod io;
 pub mod mesh;
 pub mod spatialindex;
 
+pub use minimeshb;
+
 /// Result
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

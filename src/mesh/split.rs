@@ -2,7 +2,7 @@ use super::{Cell, Edge};
 use crate::Tag;
 use rustc_hash::FxHashMap;
 
-pub(crate) fn split_edgs<'a, const C: usize, I: ExactSizeIterator<Item = (&'a Cell<C>, Tag)>>(
+pub(crate) fn split_edgs<const C: usize, I: ExactSizeIterator<Item = (Cell<C>, Tag)>>(
     elems_and_tags: I,
     edges: &FxHashMap<Edge, usize>,
 ) -> (Vec<Cell<C>>, Vec<Tag>) {
@@ -29,7 +29,7 @@ pub(crate) fn split_edgs<'a, const C: usize, I: ExactSizeIterator<Item = (&'a Ce
     (elems, etags)
 }
 
-pub(crate) fn split_tris<'a, const C: usize, I: ExactSizeIterator<Item = (&'a Cell<C>, Tag)>>(
+pub(crate) fn split_tris<const C: usize, I: ExactSizeIterator<Item = (Cell<C>, Tag)>>(
     elems_and_tags: I,
     edges: &FxHashMap<Edge, usize>,
 ) -> (Vec<Cell<C>>, Vec<Tag>) {
@@ -71,7 +71,7 @@ pub(crate) fn split_tris<'a, const C: usize, I: ExactSizeIterator<Item = (&'a Ce
     (elems, etags)
 }
 
-pub(crate) fn split_tets<'a, const C: usize, I: ExactSizeIterator<Item = (&'a Cell<C>, Tag)>>(
+pub(crate) fn split_tets<const C: usize, I: ExactSizeIterator<Item = (Cell<C>, Tag)>>(
     elems_and_tags: I,
     edges: &FxHashMap<Edge, usize>,
 ) -> (Vec<Cell<C>>, Vec<Tag>) {

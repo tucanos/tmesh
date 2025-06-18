@@ -6,6 +6,11 @@ use rustc_hash::FxHashMap;
 
 /// Simplex elements
 pub trait Simplex<const C: usize>: Sized {
+    /// Get the dimension
+    fn dim() -> usize {
+        C - 1
+    }
+
     /// Get the number of edges
     fn n_edges() -> usize {
         C * (C - 1) / 2
@@ -29,7 +34,7 @@ pub trait Simplex<const C: usize>: Sized {
     fn face<const F: usize>(&self, i: usize) -> Face<F>;
 
     /// Get the volume of a simplex
-    fn vol<const D: usize>(v: [&Vertex<D>; C]) -> f64;
+    fn vol<const D: usize>(v: &[Vertex<D>; C]) -> f64;
 
     /// Check if a normal can be computed in D dimensions
     fn has_normal<const D: usize>() -> bool {
@@ -37,10 +42,10 @@ pub trait Simplex<const C: usize>: Sized {
     }
 
     /// Normal to the vertex
-    fn normal<const D: usize>(v: [&Vertex<D>; C]) -> Vertex<D>;
+    fn normal<const D: usize>(v: &[Vertex<D>; C]) -> Vertex<D>;
 
     /// Radius (=diameter of the inner circle / sphere)
-    fn radius<const D: usize>(v: [&Vertex<D>; C]) -> f64;
+    fn radius<const D: usize>(v: &[Vertex<D>; C]) -> f64;
 
     /// Get a quadrature (weights and points)
     fn quadrature() -> (Vec<f64>, Vec<Vec<f64>>);
@@ -55,7 +60,7 @@ pub trait Simplex<const C: usize>: Sized {
     fn invert(&mut self);
 
     /// Barycentric coordinates
-    fn bcoords<const D: usize>(ge: [&Vertex<D>; C], v: &Vertex<D>) -> [f64; C];
+    fn bcoords<const D: usize>(ge: &[Vertex<D>; C], v: &Vertex<D>) -> [f64; C];
 }
 
 fn is_circ_perm<const N: usize>(a: &[usize; N], b: &[usize; N]) -> bool {
@@ -69,6 +74,54 @@ fn is_circ_perm<const N: usize>(a: &[usize; N], b: &[usize; N]) -> bool {
         }
     }
     false
+}
+
+impl Simplex<0> for [usize; 0] {
+    fn edges() -> Vec<Edge> {
+        unreachable!()
+    }
+
+    fn edge(&self, _i: usize) -> Edge {
+        unreachable!()
+    }
+
+    fn faces<const F: usize>() -> Vec<Face<F>> {
+        unreachable!()
+    }
+
+    fn face<const F: usize>(&self, _i: usize) -> Face<F> {
+        unreachable!()
+    }
+
+    fn vol<const D: usize>(_v: &[Vertex<D>; 0]) -> f64 {
+        unreachable!()
+    }
+
+    fn normal<const D: usize>(_v: &[Vertex<D>; 0]) -> Vertex<D> {
+        unreachable!()
+    }
+
+    fn radius<const D: usize>(_v: &[Vertex<D>; 0]) -> f64 {
+        unreachable!()
+    }
+
+    fn quadrature() -> (Vec<f64>, Vec<Vec<f64>>) {
+        unreachable!()
+    }
+
+    fn sorted(&self) -> Self {
+        unreachable!()
+    }
+
+    fn is_same(&self, _other: &Self) -> bool {
+        unreachable!()
+    }
+
+    fn invert(&mut self) {}
+
+    fn bcoords<const D: usize>(_ge: &[Vertex<D>; 0], _v: &Vertex<D>) -> [f64; 0] {
+        unreachable!()
+    }
 }
 
 impl Simplex<1> for Node {
@@ -88,15 +141,15 @@ impl Simplex<1> for Node {
         unreachable!()
     }
 
-    fn vol<const D: usize>(_v: [&Vertex<D>; 1]) -> f64 {
+    fn vol<const D: usize>(_v: &[Vertex<D>; 1]) -> f64 {
         unreachable!()
     }
 
-    fn normal<const D: usize>(_v: [&Vertex<D>; 1]) -> Vertex<D> {
+    fn normal<const D: usize>(_v: &[Vertex<D>; 1]) -> Vertex<D> {
         unreachable!()
     }
 
-    fn radius<const D: usize>(_v: [&Vertex<D>; 1]) -> f64 {
+    fn radius<const D: usize>(_v: &[Vertex<D>; 1]) -> f64 {
         unreachable!()
     }
 
@@ -114,7 +167,7 @@ impl Simplex<1> for Node {
 
     fn invert(&mut self) {}
 
-    fn bcoords<const D: usize>(_ge: [&Vertex<D>; 1], _v: &Vertex<D>) -> [f64; 1] {
+    fn bcoords<const D: usize>(_ge: &[Vertex<D>; 1], _v: &Vertex<D>) -> [f64; 1] {
         unreachable!()
     }
 }
@@ -147,11 +200,11 @@ impl Simplex<2> for Edge {
         [self[i0]].as_slice().try_into().unwrap()
     }
 
-    fn vol<const D: usize>(v: [&Vertex<D>; 2]) -> f64 {
+    fn vol<const D: usize>(v: &[Vertex<D>; 2]) -> f64 {
         (v[1] - v[0]).norm()
     }
 
-    fn normal<const D: usize>(v: [&Vertex<D>; 2]) -> Vertex<D> {
+    fn normal<const D: usize>(v: &[Vertex<D>; 2]) -> Vertex<D> {
         if Self::has_normal::<D>() {
             Vertex::<D>::from_column_slice(&[v[1][1] - v[0][1], v[0][0] - v[1][0]])
         } else {
@@ -159,7 +212,7 @@ impl Simplex<2> for Edge {
         }
     }
 
-    fn radius<const D: usize>(v: [&Vertex<D>; 2]) -> f64 {
+    fn radius<const D: usize>(v: &[Vertex<D>; 2]) -> f64 {
         0.5 * (v[1] - v[0]).norm()
     }
 
@@ -187,7 +240,7 @@ impl Simplex<2> for Edge {
         self.swap(1, 0);
     }
 
-    fn bcoords<const D: usize>(_ge: [&Vertex<D>; 2], _v: &Vertex<D>) -> [f64; 2] {
+    fn bcoords<const D: usize>(_ge: &[Vertex<D>; 2], _v: &Vertex<D>) -> [f64; 2] {
         unreachable!()
     }
 }
@@ -222,7 +275,7 @@ impl Simplex<3> for Triangle {
         [self[i0], self[i1]].as_slice().try_into().unwrap()
     }
 
-    fn vol<const D: usize>(v: [&Vertex<D>; 3]) -> f64 {
+    fn vol<const D: usize>(v: &[Vertex<D>; 3]) -> f64 {
         if Self::has_normal::<D>() {
             Self::normal(v).norm()
         } else {
@@ -234,7 +287,7 @@ impl Simplex<3> for Triangle {
         }
     }
 
-    fn normal<const D: usize>(v: [&Vertex<D>; 3]) -> Vertex<D> {
+    fn normal<const D: usize>(v: &[Vertex<D>; 3]) -> Vertex<D> {
         if Self::has_normal::<D>() {
             let e1 = v[1] - v[0];
             let e2 = v[2] - v[0];
@@ -244,7 +297,7 @@ impl Simplex<3> for Triangle {
         }
     }
 
-    fn radius<const D: usize>(v: [&Vertex<D>; 3]) -> f64 {
+    fn radius<const D: usize>(v: &[Vertex<D>; 3]) -> f64 {
         let a = (v[2] - v[1]).norm();
         let b = (v[2] - v[0]).norm();
         let c = (v[1] - v[0]).norm();
@@ -276,7 +329,7 @@ impl Simplex<3> for Triangle {
         self.swap(1, 0);
     }
 
-    fn bcoords<const D: usize>(ge: [&Vertex<D>; 3], v: &Vertex<D>) -> [f64; 3] {
+    fn bcoords<const D: usize>(ge: &[Vertex<D>; 3], v: &Vertex<D>) -> [f64; 3] {
         if D == 2 {
             let a = SMatrix::<f64, 3, 3>::new(
                 1.0, 1.0, 1.0, ge[0][0], ge[1][0], ge[2][0], ge[0][1], ge[1][1], ge[2][1],
@@ -333,7 +386,7 @@ impl Simplex<4> for Tetrahedron {
             .unwrap()
     }
 
-    fn vol<const D: usize>(v: [&Vertex<D>; 4]) -> f64 {
+    fn vol<const D: usize>(v: &[Vertex<D>; 4]) -> f64 {
         let e1 = v[1] - v[0];
         let e2 = v[2] - v[0];
         let e3 = v[3] - v[0];
@@ -341,11 +394,11 @@ impl Simplex<4> for Tetrahedron {
         e3.dot(&e1.cross(&e2)) / 6.0
     }
 
-    fn normal<const D: usize>(_v: [&Vertex<D>; 4]) -> Vertex<D> {
+    fn normal<const D: usize>(_v: &[Vertex<D>; 4]) -> Vertex<D> {
         unreachable!()
     }
 
-    fn radius<const D: usize>(_v: [&Vertex<D>; 4]) -> f64 {
+    fn radius<const D: usize>(_v: &[Vertex<D>; 4]) -> f64 {
         unimplemented!()
     }
 
@@ -374,7 +427,7 @@ impl Simplex<4> for Tetrahedron {
         self.swap(1, 0);
     }
 
-    fn bcoords<const D: usize>(ge: [&Vertex<D>; 4], v: &Vertex<D>) -> [f64; 4] {
+    fn bcoords<const D: usize>(ge: &[Vertex<D>; 4], v: &Vertex<D>) -> [f64; 4] {
         let a = SMatrix::<f64, 4, 4>::new(
             1.0, 1.0, 1.0, 1.0, ge[0][0], ge[1][0], ge[2][0], ge[3][0], ge[0][1], ge[1][1],
             ge[2][1], ge[3][1], ge[0][2], ge[1][2], ge[2][2], ge[3][2],

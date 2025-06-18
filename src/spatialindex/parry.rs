@@ -89,7 +89,7 @@ mod parry2d {
     }
 
     impl<const D: usize, MS: MeshToShape> MeshShape<D, MS> {
-        fn local_aabb<const C: usize>(ge: &[&Vertex<D>; C]) -> Aabb {
+        fn local_aabb<const C: usize>(ge: &[Vertex<D>; C]) -> Aabb {
             let mut min = Point::origin();
             let mut max = min;
 
@@ -117,12 +117,8 @@ mod parry2d {
                 .enumerate()
                 .map(|(i, ge)| (i as u32, Self::local_aabb(&ge)));
             tree.clear_and_rebuild(data, 0.);
-            let elems = mesh.elems().cloned().flatten().collect::<Vec<_>>();
-            let verts = mesh
-                .verts()
-                .flat_map(|x| x.as_slice())
-                .cloned()
-                .collect::<Vec<_>>();
+            let elems = mesh.elems().flatten().collect::<Vec<_>>();
+            let verts = mesh.verts().flat_map(|x| [x[0], x[1]]).collect::<Vec<_>>();
             Self {
                 verts,
                 elems,
@@ -341,7 +337,7 @@ mod parry3d {
         phantom: PhantomData<MS>,
     }
     impl<const D: usize, MS: MeshToShape> MeshShape<D, MS> {
-        fn local_aabb<const C: usize>(ge: &[&Vertex<D>; C]) -> Aabb {
+        fn local_aabb<const C: usize>(ge: &[Vertex<D>; C]) -> Aabb {
             let mut min = Point::origin();
             let mut max = min;
 
@@ -368,11 +364,10 @@ mod parry3d {
                 .enumerate()
                 .map(|(i, ge)| (i as u32, Self::local_aabb(&ge)));
             tree.clear_and_rebuild(data, 0.);
-            let elems = mesh.elems().cloned().flatten().collect::<Vec<_>>();
+            let elems = mesh.elems().flatten().collect::<Vec<_>>();
             let verts = mesh
                 .verts()
-                .flat_map(|x| x.as_slice())
-                .cloned()
+                .flat_map(|x| [x[0], x[1], x[2]])
                 .collect::<Vec<_>>();
 
             Self {

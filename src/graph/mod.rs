@@ -2,6 +2,7 @@
 //! simple 2d arrays
 use crate::{Error, Result};
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use std::fmt::Debug;
 
 /// Compute the indices that would sort `data`
 fn argsort(data: &[usize]) -> Vec<usize> {
@@ -45,24 +46,30 @@ pub struct CSRGraph {
 
 impl CSRGraph {
     fn set_ptr<
-        'a,
-        E: IntoIterator<Item = usize> + Copy + 'a,
-        I: ExactSizeIterator<Item = &'a E> + Clone,
+        T: TryInto<usize> + Ord + Debug,
+        E: IntoIterator<Item = T> + Copy,
+        I: ExactSizeIterator<Item = E> + Clone,
     >(
         elems: I,
-    ) -> Self {
-        let nv = elems
-            .clone()
-            .copied()
-            .flatten()
-            .filter(|&i| i != usize::MAX)
-            .max()
-            .unwrap_or(0)
-            + 1;
+        n_verts: Option<usize>,
+    ) -> Self
+    where
+        <T as std::convert::TryInto<usize>>::Error: Debug,
+    {
+        let nv = n_verts.unwrap_or(
+            elems
+                .clone()
+                .flatten()
+                .map(|i| i.try_into().unwrap())
+                .filter(|&i| i != usize::MAX)
+                .max()
+                .unwrap_or(0)
+                + 1,
+        );
         let n = elems
             .clone()
-            .copied()
             .flatten()
+            .map(|i| i.try_into().unwrap())
             .filter(|&i| i != usize::MAX)
             .count();
 
@@ -73,7 +80,11 @@ impl CSRGraph {
             m: 0,
         };
 
-        for i in elems.copied().flatten().filter(|&i| i != usize::MAX) {
+        for i in elems
+            .flatten()
+            .map(|i| i.try_into().unwrap())
+            .filter(|&i| i != usize::MAX)
+        {
             res.ptr[i + 1] += 1;
         }
 
@@ -111,13 +122,22 @@ impl CSRGraph {
     }
 
     /// Create a graph from edges
-    pub fn from_edges<'a, I: ExactSizeIterator<Item = &'a [usize; 2]> + Clone>(edgs: I) -> Self {
-        let mut res = Self::set_ptr(edgs.clone());
+    pub fn from_edges<
+        T: TryInto<usize> + Ord + Debug + Copy,
+        I: ExactSizeIterator<Item = [T; 2]> + Clone,
+    >(
+        edgs: I,
+        n_verts: Option<usize>,
+    ) -> Self
+    where
+        <T as std::convert::TryInto<usize>>::Error: Debug,
+    {
+        let mut res = Self::set_ptr(edgs.clone(), n_verts);
         res.m = res.n();
 
         for e in edgs {
-            let i0 = e[0];
-            let i1 = e[1];
+            let i0 = e[0].try_into().unwrap();
+            let i1 = e[1].try_into().unwrap();
             assert!(i0 != usize::MAX);
             assert!(i1 != usize::MAX);
             let mut ok = false;
@@ -144,15 +164,28 @@ impl CSRGraph {
     }
 
     /// Compute the vertex to element connectivity from an element to vertex connectivity
-    pub fn transpose<'a, const N: usize, I: ExactSizeIterator<Item = &'a [usize; N]> + Clone>(
+    pub fn transpose<
+        T: TryInto<usize> + Ord + Debug,
+        E: IntoIterator<Item = T> + Copy,
+        I: ExactSizeIterator<Item = E> + Clone,
+    >(
         elems: I,
-    ) -> Self {
-        let mut res = Self::set_ptr(elems.clone());
+        n_verts: Option<usize>,
+    ) -> Self
+    where
+        <T as std::convert::TryInto<usize>>::Error: Debug,
+    {
+        let mut res = Self::set_ptr(elems.clone(), n_verts);
         res.m = elems.len();
         let mut values = vec![0; res.indices.len()];
 
         for (i, e) in elems.enumerate() {
-            for (v, &i_vert) in e.iter().filter(|&&i| i != usize::MAX).enumerate() {
+            for (v, i_vert) in e
+                .into_iter()
+                .map(|i| i.try_into().unwrap())
+                .filter(|&i| i != usize::MAX)
+                .enumerate()
+            {
                 let start = res.ptr[i_vert];
                 let end = res.ptr[i_vert + 1];
                 let mut ok = false;
@@ -377,7 +410,7 @@ mod tests {
     #[test]
     fn test_csr_edges() {
         let g = [[0, 1], [1, 2], [2, 0], [3, 4]];
-        let g = CSRGraph::from_edges(g.iter());
+        let g = CSRGraph::from_edges(g.iter().cloned(), None);
         assert_eq!(g.n(), 5);
         assert_eq!(g.m(), 5);
         assert_eq!(g.n_edges(), 8);
@@ -395,9 +428,9 @@ mod tests {
 
     #[test]
     fn test_csr_triangles() {
-        let g = [[0, 1, 2], [0, 2, 3]];
+        let g = [[0_i16, 1_i16, 2_i16], [0_i16, 2_i16, 3_i16]];
 
-        let g = CSRGraph::transpose(g.iter());
+        let g = CSRGraph::transpose(g.iter().cloned(), None);
         assert_eq!(g.n(), 4);
         assert_eq!(g.m(), 2);
 
@@ -422,7 +455,7 @@ mod tests {
             .collect::<Vec<_>>();
         edgs.extend(bdy.iter());
 
-        let g = CSRGraph::transpose(edgs.iter());
+        let g = CSRGraph::transpose(edgs.iter().cloned(), None);
         assert_eq!(g.n(), 4);
         assert_eq!(g.m(), 13);
 
@@ -449,7 +482,7 @@ mod tests {
     #[test]
     fn test_cc() {
         let g = [[0, 1], [1, 2], [2, 0], [3, 4]];
-        let g = CSRGraph::from_edges(g.iter());
+        let g = CSRGraph::from_edges(g.iter().cloned(), None);
         let cc = g.connected_components().unwrap();
         assert_eq!(cc, [0, 0, 0, 1, 1]);
     }

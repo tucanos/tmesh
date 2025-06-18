@@ -72,7 +72,7 @@ where
     }
 
     /// Get the vertex coordinates for face `f`
-    fn gface(&self, f: &[usize; F]) -> [&Vertex<D>; F] {
+    fn gface(&self, f: &[usize; F]) -> [Vertex<D>; F] {
         let mut res = [self.vert(0); F];
         for (j, &k) in f.iter().enumerate() {
             res[j] = self.vert(k);
@@ -81,7 +81,7 @@ where
     }
 
     /// Parallel iterator over the faces vertex coordinates
-    fn par_gfaces(&self) -> impl IndexedParallelIterator<Item = [&Vertex<D>; F]> + '_ {
+    fn par_gfaces(&self) -> impl IndexedParallelIterator<Item = [Vertex<D>; F]> + '_ {
         self.par_faces().map(|f| {
             let f = f.try_into().unwrap();
             self.gface(&f)
@@ -89,7 +89,7 @@ where
     }
 
     /// Sequential iterator over the faces vertex coordinates
-    fn gfaces(&self) -> impl ExactSizeIterator<Item = [&Vertex<D>; F]> + '_ {
+    fn gfaces(&self) -> impl ExactSizeIterator<Item = [Vertex<D>; F]> + '_ {
         self.faces().map(|f| {
             let f = f.try_into().unwrap();
             self.gface(&f)
@@ -151,7 +151,7 @@ where
                 }
                 self.gface(&f)
             })
-            .map(|gf| cell_center(gf).dot(&Face::<F>::normal(gf)))
+            .map(|gf| cell_center(&gf).dot(&Face::<F>::normal(&gf)))
             .sum::<f64>()
             / D as f64
     }
@@ -179,7 +179,7 @@ where
                 self.gface(&f)
             })
             .for_each(|gf| {
-                let n = Face::<F>::normal(gf);
+                let n = Face::<F>::normal(&gf);
                 res.iter_mut().zip(n.iter()).for_each(|(x, y)| *x += y)
             });
         res.iter().map(|x| x.abs()).sum::<f64>() < 1e-10
@@ -285,7 +285,7 @@ where
             .iter()
             .enumerate()
             .filter(|(_, &j)| j != usize::MAX)
-            .for_each(|(i, &j)| verts[j] = *self.vert(i));
+            .for_each(|(i, &j)| verts[j] = self.vert(i));
         self.faces()
             .zip(self.ftags())
             .filter(|(f, _)| f.iter().all(|&i| new_ids[i] != usize::MAX))
@@ -312,7 +312,7 @@ where
 }
 
 /// Get the barycentric coordinates of the circumcenter
-pub fn circumcenter_bcoords<const D: usize, const C: usize>(v: [&Vertex<D>; C]) -> [f64; C] {
+pub fn circumcenter_bcoords<const D: usize, const C: usize>(v: &[Vertex<D>; C]) -> [f64; C] {
     assert!(C <= D + 1);
 
     let mut a = DMatrix::<f64>::zeros(C + 1, C + 1);
@@ -320,10 +320,10 @@ pub fn circumcenter_bcoords<const D: usize, const C: usize>(v: [&Vertex<D>; C]) 
 
     for i in 0..C {
         for j in i..C {
-            a[(C + 1) * i + j] = 2.0 * v[i].dot(v[j]);
+            a[(C + 1) * i + j] = 2.0 * v[i].dot(&v[j]);
             a[(C + 1) * j + i] = a[(C + 1) * i + j];
         }
-        b[i] = v[i].dot(v[i]);
+        b[i] = v[i].dot(&v[i]);
     }
     b[C] = 1.0;
     let j = C;
@@ -354,9 +354,9 @@ mod tests {
             let p0 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p1 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p2 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
-            let ge = [&p0, &p1, &p2];
-            let bcoords = circumcenter_bcoords(ge);
-            let p = cell_vertex(ge, bcoords);
+            let ge = [p0, p1, p2];
+            let bcoords = circumcenter_bcoords(&ge);
+            let p = cell_vertex(&ge, bcoords);
             let l0 = (p0 - p).norm();
             let l1 = (p1 - p).norm();
             let l2 = (p2 - p).norm();
@@ -372,9 +372,9 @@ mod tests {
         for _ in 0..100 {
             let p0 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p1 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
-            let ge = [&p0, &p1];
-            let bcoords = circumcenter_bcoords(ge);
-            let p = cell_vertex(ge, bcoords);
+            let ge = [p0, p1];
+            let bcoords = circumcenter_bcoords(&ge);
+            let p = cell_vertex(&ge, bcoords);
             let l0 = (p0 - p).norm();
             let l1 = (p1 - p).norm();
             assert_delta!(l0, l1, 1e-12);
@@ -392,9 +392,9 @@ mod tests {
             let p1 = Vert3d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p2 = Vert3d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p3 = Vert3d::from_fn(|_, _| rng.random::<f64>() - 0.5);
-            let ge = [&p0, &p1, &p2, &p3];
-            let bcoords = circumcenter_bcoords(ge);
-            let p = cell_vertex(ge, bcoords);
+            let ge = [p0, p1, p2, p3];
+            let bcoords = circumcenter_bcoords(&ge);
+            let p = cell_vertex(&ge, bcoords);
             let l0 = (p0 - p).norm();
             let l1 = (p1 - p).norm();
             let l2 = (p2 - p).norm();
@@ -413,9 +413,9 @@ mod tests {
             let p0 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p1 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
             let p2 = Vert2d::from_fn(|_, _| rng.random::<f64>() - 0.5);
-            let ge = [&p0, &p1, &p2];
-            let bcoords = circumcenter_bcoords(ge);
-            let p = cell_vertex(ge, bcoords);
+            let ge = [p0, p1, p2];
+            let bcoords = circumcenter_bcoords(&ge);
+            let p = cell_vertex(&ge, bcoords);
             let l0 = (p0 - p).norm();
             let l1 = (p1 - p).norm();
             let l2 = (p2 - p).norm();

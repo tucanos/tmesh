@@ -83,10 +83,10 @@ impl Partitioner for HilbertPartitioner {
         Cell<C>: Simplex<C>,
         Face<F>: Simplex<F>,
     {
-        let faces = msh.compute_faces();
+        let faces = msh.all_faces();
         let graph = msh.element_pairs(&faces);
 
-        let centers = msh.gelems().map(cell_center);
+        let centers = msh.gelems().map(|ge| cell_center(&ge));
         let ids = hilbert_indices(centers);
         let weights = weights.unwrap_or(vec![1.0; msh.n_elems()]);
         Ok(Self {
@@ -141,7 +141,7 @@ impl Partitioner for RCMPartitioner {
         Cell<C>: Simplex<C>,
         Face<F>: Simplex<F>,
     {
-        let faces = msh.compute_faces();
+        let faces = msh.all_faces();
         let graph = msh.element_pairs(&faces);
 
         let weights = weights.unwrap_or(vec![1.0; msh.n_elems()]);
@@ -197,12 +197,12 @@ impl Partitioner for KMeansPartitioner2d {
     {
         match D {
             2 => {
-                let faces = msh.compute_faces();
+                let faces = msh.all_faces();
                 let graph = msh.element_pairs(&faces);
 
                 let centers = msh
                     .gelems()
-                    .map(|ge| Vert2d::from_row_slice(cell_center(ge).as_slice()))
+                    .map(|ge| Vert2d::from_row_slice(cell_center(&ge).as_slice()))
                     .collect();
                 let weights = weights.unwrap_or(vec![1.0; msh.n_elems()]);
                 Ok(Self {
@@ -262,12 +262,12 @@ impl Partitioner for KMeansPartitioner3d {
     {
         match D {
             3 => {
-                let faces = msh.compute_faces();
+                let faces = msh.all_faces();
                 let graph = msh.element_pairs(&faces);
 
                 let centers = msh
                     .gelems()
-                    .map(|ge| Vert3d::from_row_slice(cell_center(ge).as_slice()))
+                    .map(|ge| Vert3d::from_row_slice(cell_center(&ge).as_slice()))
                     .collect();
                 let weights = weights.unwrap_or(vec![1.0; msh.n_elems()]);
                 Ok(Self {
@@ -365,7 +365,7 @@ impl<T: MetisPartMethod> Partitioner for MetisPartitioner<T> {
         Cell<C>: Simplex<C>,
         Face<F>: Simplex<F>,
     {
-        let faces = msh.compute_faces();
+        let faces = msh.all_faces();
         let graph = msh.element_pairs(&faces);
 
         let weights = weights.unwrap_or(vec![1.0; msh.n_elems()]);

@@ -71,7 +71,7 @@ fn main() -> Result<()> {
     );
     for i in 0..n_parts {
         let pmesh: Mesh3d = msh.get_partition(i);
-        let cc = pmesh.compute_vertex_to_vertices().connected_components()?;
+        let cc = pmesh.vertex_to_vertices().connected_components()?;
         let n_cc = cc.iter().cloned().max().unwrap_or(0) + 1;
         println!("  part {i}: {n_cc} components");
     }
@@ -87,7 +87,7 @@ fn main() -> Result<()> {
     );
     for i in 0..n_parts {
         let pmesh: Mesh3d = msh.get_partition(i);
-        let cc = pmesh.compute_vertex_to_vertices().connected_components()?;
+        let cc = pmesh.vertex_to_vertices().connected_components()?;
         let n_cc = cc.iter().cloned().max().unwrap_or(0) + 1;
         println!("  part {i}: {n_cc} components");
     }
@@ -103,7 +103,7 @@ fn main() -> Result<()> {
     );
     for i in 0..n_parts {
         let pmesh: Mesh3d = msh.get_partition(i);
-        let cc = pmesh.compute_vertex_to_vertices().connected_components()?;
+        let cc = pmesh.vertex_to_vertices().connected_components()?;
         let n_cc = cc.iter().cloned().max().unwrap_or(0) + 1;
         println!("  part {i}: {n_cc} components");
     }
@@ -122,7 +122,7 @@ fn main() -> Result<()> {
         );
         for i in 0..n_parts {
             let pmesh: Mesh3d = msh.get_partition(i);
-            let cc = pmesh.compute_vertex_to_vertices().connected_components()?;
+            let cc = pmesh.vertex_to_vertices().connected_components()?;
             let n_cc = cc.iter().cloned().max().unwrap_or(0) + 1;
             println!("  part {i}: {n_cc} components");
         }
@@ -138,7 +138,7 @@ fn main() -> Result<()> {
         );
         for i in 0..n_parts {
             let pmesh: Mesh3d = msh.get_partition(i);
-            let cc = pmesh.compute_vertex_to_vertices().connected_components()?;
+            let cc = pmesh.vertex_to_vertices().connected_components()?;
             let n_cc = cc.iter().cloned().max().unwrap_or(0) + 1;
             println!("  part {i}: {n_cc} components");
         }

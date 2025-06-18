@@ -1,7 +1,7 @@
 //! Extrude 2d triangle meshes to 3d as 1 layer of prisms
 use crate::{
     dual::{merge_polylines, DualMesh2d, PolyMesh, PolyMeshType, SimplePolyMesh},
-    io::{Encoding, VTUFile},
+    io::{VTUEncoding, VTUFile},
     mesh::{Mesh, Mesh2d, Prism, Quadrangle, Triangle},
     Error, Result, Tag, Vert2d, Vert3d,
 };
@@ -56,7 +56,7 @@ impl ExtrudedMesh2d {
             .collect::<Vec<_>>();
         let etags = msh.etags().collect::<Vec<_>>();
 
-        let mut tris = msh.elems().cloned().collect::<Vec<_>>();
+        let mut tris = msh.elems().collect::<Vec<_>>();
         tris.extend(msh.elems().map(|tri| [tri[0] + n, tri[2] + n, tri[1] + n]));
         let mut tri_tags = vec![Tag::MAX; msh.n_elems()];
         tri_tags.resize(2 * msh.n_elems(), Tag::MAX - 1);
@@ -108,7 +108,7 @@ impl ExtrudedMesh2d {
         let faces = self.quads.iter().map(|p| [p[0], p[1]]).collect::<Vec<_>>();
         let ftags = self.quad_tags.clone();
 
-        Ok(Mesh2d::new(verts, elems, etags, faces, ftags))
+        Ok(Mesh2d::new(&verts, &elems, &etags, &faces, &ftags))
     }
 
     /// Number of vertices
@@ -117,8 +117,8 @@ impl ExtrudedMesh2d {
     }
 
     /// Sequential iterator over the vertices
-    pub fn verts(&self) -> impl ExactSizeIterator<Item = &Vert3d> + '_ {
-        self.verts.iter()
+    pub fn verts(&self) -> impl ExactSizeIterator<Item = Vert3d> + '_ {
+        self.verts.iter().cloned()
     }
 
     /// Number of prisms
@@ -168,7 +168,7 @@ impl ExtrudedMesh2d {
 
     /// Write the mesh in a `.vtu` file
     pub fn write_vtk(&self, file_name: &str) -> Result<()> {
-        let vtu = VTUFile::from_extruded_mesh(self, Encoding::Binary);
+        let vtu = VTUFile::from_extruded_mesh(self, VTUEncoding::Binary);
 
         vtu.export(file_name)?;
 

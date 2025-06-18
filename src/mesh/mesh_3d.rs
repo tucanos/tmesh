@@ -1,6 +1,10 @@
 //! Tetrahedron meshes in 3d
-use super::{Mesh, Tetrahedron, Triangle};
-use crate::{Tag, Vert3d};
+use super::{Mesh, MutMesh, Tetrahedron, Triangle};
+use crate::{
+    impl_mesh_simple,
+    mesh::{Cell, Face, Simplex},
+    Tag, Vert3d, Vertex,
+};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// Create a `Mesh<3, 4, 3>` of a `lx` by `ly` by `lz` box by splitting a `nx` by `ny` by `nz`
@@ -141,184 +145,7 @@ pub struct Mesh3d {
     ftags: Vec<Tag>,
 }
 
-impl Mesh3d {
-    /// Create a new mesh from coordinates, connectivities and tags
-    pub fn new(
-        verts: Vec<Vert3d>,
-        elems: Vec<Tetrahedron>,
-        etags: Vec<Tag>,
-        faces: Vec<Triangle>,
-        ftags: Vec<Tag>,
-    ) -> Self {
-        Self {
-            verts,
-            elems,
-            etags,
-            faces,
-            ftags,
-        }
-    }
-}
-
-impl Mesh<3, 4, 3> for Mesh3d {
-    fn empty() -> Self {
-        Self {
-            verts: Vec::new(),
-            elems: Vec::new(),
-            etags: Vec::new(),
-            faces: Vec::new(),
-            ftags: Vec::new(),
-        }
-    }
-
-    fn n_verts(&self) -> usize {
-        self.verts.len()
-    }
-
-    fn vert(&self, i: usize) -> &Vert3d {
-        &self.verts[i]
-    }
-
-    fn verts(&self) -> impl ExactSizeIterator<Item = &Vert3d> + Clone + '_ {
-        self.verts.iter()
-    }
-
-    fn verts_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Vert3d> + '_ {
-        self.verts.iter_mut()
-    }
-
-    fn par_verts(&self) -> impl IndexedParallelIterator<Item = &Vert3d> + Clone + '_ {
-        self.verts.par_iter()
-    }
-
-    fn add_verts<I: ExactSizeIterator<Item = Vert3d>>(&mut self, v: I) {
-        self.verts.extend(v);
-    }
-
-    fn n_elems(&self) -> usize {
-        self.elems.len()
-    }
-
-    fn elem(&self, i: usize) -> &Tetrahedron {
-        &self.elems[i]
-    }
-
-    fn elems(&self) -> impl ExactSizeIterator<Item = &Tetrahedron> + Clone + '_ {
-        self.elems.iter()
-    }
-
-    fn elems_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tetrahedron> + '_ {
-        self.elems.iter_mut()
-    }
-
-    fn par_elems(&self) -> impl IndexedParallelIterator<Item = &Tetrahedron> + Clone + '_ {
-        self.elems.par_iter()
-    }
-
-    fn etag(&self, i: usize) -> Tag {
-        self.etags[i]
-    }
-
-    fn etags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_ {
-        self.etags.iter().cloned()
-    }
-
-    fn etags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_ {
-        self.etags.iter_mut()
-    }
-
-    fn par_etags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
-        self.etags.par_iter().cloned()
-    }
-
-    fn add_elems<I1: ExactSizeIterator<Item = Tetrahedron>, I2: ExactSizeIterator<Item = Tag>>(
-        &mut self,
-        elems: I1,
-        etags: I2,
-    ) {
-        self.elems.extend(elems);
-        self.etags.extend(etags);
-    }
-
-    fn clear_elems(&mut self) {
-        self.elems.clear();
-        self.etags.clear();
-    }
-
-    fn add_elems_and_tags<I: ExactSizeIterator<Item = (Tetrahedron, Tag)>>(
-        &mut self,
-        elems_and_tags: I,
-    ) {
-        self.elems.reserve(elems_and_tags.len());
-        self.etags.reserve(elems_and_tags.len());
-        for (e, t) in elems_and_tags {
-            self.elems.push(e);
-            self.etags.push(t);
-        }
-    }
-
-    fn n_faces(&self) -> usize {
-        self.faces.len()
-    }
-
-    fn face(&self, i: usize) -> &Triangle {
-        &self.faces[i]
-    }
-
-    fn faces(&self) -> impl ExactSizeIterator<Item = &Triangle> + Clone + '_ {
-        self.faces.iter()
-    }
-
-    fn faces_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Triangle> + '_ {
-        self.faces.iter_mut()
-    }
-
-    fn par_faces(&self) -> impl IndexedParallelIterator<Item = &Triangle> + Clone + '_ {
-        self.faces.par_iter()
-    }
-
-    fn ftag(&self, i: usize) -> Tag {
-        self.ftags[i]
-    }
-
-    fn ftags(&self) -> impl ExactSizeIterator<Item = Tag> + Clone + '_ {
-        self.ftags.iter().cloned()
-    }
-
-    fn ftags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_ {
-        self.ftags.iter_mut()
-    }
-
-    fn par_ftags(&self) -> impl IndexedParallelIterator<Item = Tag> + Clone + '_ {
-        self.ftags.par_iter().cloned()
-    }
-
-    fn add_faces<I1: ExactSizeIterator<Item = Triangle>, I2: ExactSizeIterator<Item = Tag>>(
-        &mut self,
-        faces: I1,
-        ftags: I2,
-    ) {
-        self.faces.extend(faces);
-        self.ftags.extend(ftags);
-    }
-
-    fn clear_faces(&mut self) {
-        self.faces.clear();
-        self.ftags.clear();
-    }
-
-    fn add_faces_and_tags<I: ExactSizeIterator<Item = (Triangle, Tag)>>(
-        &mut self,
-        faces_and_tags: I,
-    ) {
-        self.faces.reserve(faces_and_tags.len());
-        self.ftags.reserve(faces_and_tags.len());
-        for (e, t) in faces_and_tags {
-            self.faces.push(e);
-            self.ftags.push(t);
-        }
-    }
-}
+impl_mesh_simple!(Mesh3d, 3, 4, 3);
 
 #[cfg(test)]
 mod tests {
@@ -337,10 +164,10 @@ mod tests {
     fn test_box() {
         let msh = box_mesh::<Mesh3d>(1.0, 2, 1.0, 2, 1.0, 2).random_shuffle();
 
-        let faces = msh.compute_faces();
+        let faces = msh.all_faces();
         msh.check(&faces).unwrap();
 
-        let vol = msh.gelems().map(Tetrahedron::vol).sum::<f64>();
+        let vol = msh.gelems().map(|ge| Tetrahedron::vol(&ge)).sum::<f64>();
         assert_delta!(vol, 1.0, 1e-12);
     }
 
@@ -352,7 +179,7 @@ mod tests {
             .par_verts()
             .map(|v| grad[0] * v[0] + grad[1] * v[1] + grad[2] * v[2])
             .collect::<Vec<_>>();
-        let v2v = msh.compute_vertex_to_vertices();
+        let v2v = msh.vertex_to_vertices();
         let gradient = msh.gradient(&v2v, 1, &f).collect::<Vec<_>>();
 
         for &x in &gradient {
@@ -367,14 +194,17 @@ mod tests {
         let v1 = Vert3d::new(1.0, 0.0, 0.0);
         let v2 = Vert3d::new(0.0, 1.0, 0.0);
         let v3 = Vert3d::new(0.0, 0.0, 1.0);
-        let ge = [&v0, &v1, &v2, &v3];
-        assert_delta!(Tetrahedron::vol(ge), 1.0 / 6.0, 1e-12);
-        let ge = [&v0, &v2, &v1, &v3];
-        assert_delta!(Tetrahedron::vol(ge), -1.0 / 6.0, 1e-12);
+        let ge = [v0, v1, v2, v3];
+        assert_delta!(Tetrahedron::vol(&ge), 1.0 / 6.0, 1e-12);
+        let ge = [v0, v2, v1, v3];
+        assert_delta!(Tetrahedron::vol(&ge), -1.0 / 6.0, 1e-12);
 
         let msh = box_mesh::<Mesh3d>(1.0, 10, 2.0, 15, 1.0, 20).random_shuffle();
 
-        let vol = msh.par_gelems().map(Tetrahedron::vol).sum::<f64>();
+        let vol = msh
+            .par_gelems()
+            .map(|ge| Tetrahedron::vol(&ge))
+            .sum::<f64>();
         assert_delta!(vol, 2.0, 1e-12);
 
         let f = msh.par_verts().map(|v| v[0]).collect::<Vec<_>>();
@@ -419,9 +249,9 @@ mod tests {
         }
 
         for (i, v) in msh_rcm.gelems().enumerate() {
-            let v = cell_center(v);
-            let other = msh.gelem(msh.elem(elem_ids[i]));
-            let other = cell_center(other);
+            let v = cell_center(&v);
+            let other = msh.gelem(&msh.elem(elem_ids[i]));
+            let other = cell_center(&other);
             assert!((v - other).norm() < 1e-12);
         }
 
@@ -431,9 +261,9 @@ mod tests {
         }
 
         for (i, v) in msh_rcm.gfaces().enumerate() {
-            let v = cell_center(v);
-            let other = msh.gface(msh.face(face_ids[i]));
-            let other = cell_center(other);
+            let v = cell_center(&v);
+            let other = msh.gface(&msh.face(face_ids[i]));
+            let other = cell_center(&other);
             assert!((v - other).norm() < 1e-12);
         }
 
@@ -442,7 +272,7 @@ mod tests {
             assert_eq!(tag, other);
         }
 
-        msh_rcm.check(&msh_rcm.compute_faces()).unwrap();
+        msh_rcm.check(&msh_rcm.all_faces()).unwrap();
     }
 
     #[test]
@@ -455,10 +285,7 @@ mod tests {
 
         for i in 0..4 {
             let part: Mesh3d = msh.get_partition(i);
-            let cc = part
-                .compute_vertex_to_vertices()
-                .connected_components()
-                .unwrap();
+            let cc = part.vertex_to_vertices().connected_components().unwrap();
             let n_cc = cc.iter().cloned().max().unwrap() + 1;
             assert_eq!(n_cc, 1);
         }
@@ -480,9 +307,9 @@ mod tests {
         }
 
         for (i, v) in msh_hilbert.gelems().enumerate() {
-            let v = cell_center(v);
-            let other = msh.gelem(msh.elem(elem_ids[i]));
-            let other = cell_center(other);
+            let v = cell_center(&v);
+            let other = msh.gelem(&msh.elem(elem_ids[i]));
+            let other = cell_center(&other);
             assert!((v - other).norm() < 1e-12);
         }
 
@@ -492,9 +319,9 @@ mod tests {
         }
 
         for (i, v) in msh_hilbert.gfaces().enumerate() {
-            let v = cell_center(v);
-            let other = msh.gface(msh.face(face_ids[i]));
-            let other = cell_center(other);
+            let v = cell_center(&v);
+            let other = msh.gface(&msh.face(face_ids[i]));
+            let other = cell_center(&other);
             assert!((v - other).norm() < 1e-12);
         }
 
@@ -503,7 +330,7 @@ mod tests {
             assert_eq!(tag, other);
         }
 
-        msh_hilbert.check(&msh_hilbert.compute_faces()).unwrap();
+        msh_hilbert.check(&msh_hilbert.all_faces()).unwrap();
     }
 
     #[test]
@@ -516,10 +343,7 @@ mod tests {
 
         for i in 0..4 {
             let part: Mesh3d = msh.get_partition(i);
-            let cc = part
-                .compute_vertex_to_vertices()
-                .connected_components()
-                .unwrap();
+            let cc = part.vertex_to_vertices().connected_components().unwrap();
             let n_cc = cc.iter().cloned().max().unwrap() + 1;
             assert_eq!(n_cc, 1);
         }
@@ -535,10 +359,7 @@ mod tests {
 
         for i in 0..4 {
             let part: Mesh3d = msh.get_partition(i);
-            let cc = part
-                .compute_vertex_to_vertices()
-                .connected_components()
-                .unwrap();
+            let cc = part.vertex_to_vertices().connected_components().unwrap();
             let n_cc = cc.iter().cloned().max().unwrap() + 1;
             assert_eq!(n_cc, 1);
         }
@@ -554,10 +375,10 @@ mod tests {
         assert_eq!(msh.n_elems(), 6 * 8);
 
         let (bdy, _): (BoundaryMesh3d, _) = msh.boundary();
-        let area = bdy.gelems().map(Triangle::vol).sum::<f64>();
+        let area = bdy.gelems().map(|ge| Triangle::vol(&ge)).sum::<f64>();
         assert_delta!(area, 6.0, 1e-10);
 
-        let vol = msh.gelems().map(Tetrahedron::vol).sum::<f64>();
+        let vol = msh.gelems().map(|ge| Tetrahedron::vol(&ge)).sum::<f64>();
         assert_delta!(vol, 1.0, 1e-10);
     }
 }

@@ -10,7 +10,7 @@ pub struct PointIndex<const D: usize> {
 
 impl<const D: usize> PointIndex<D> {
     /// Create a PointIndex from vertices
-    pub fn new<'a, I: ExactSizeIterator<Item = &'a Vertex<D>>>(verts: I) -> Self {
+    pub fn new<I: ExactSizeIterator<Item = Vertex<D>>>(verts: I) -> Self {
         assert!(verts.len() > 0);
         let mut tree = kdtree::KdTree::new(D);
         for (i, pt) in verts.enumerate() {
@@ -38,7 +38,7 @@ mod tests {
     use std::{f64::consts::PI, time::Instant};
 
     use crate::{
-        mesh::{BoundaryMesh2d, BoundaryMesh3d},
+        mesh::{BoundaryMesh2d, BoundaryMesh3d, Mesh},
         spatialindex::ObjectIndex,
         Vert2d, Vert3d,
     };
@@ -56,7 +56,7 @@ mod tests {
         let faces = Vec::new();
         let ftags = Vec::new();
 
-        let mesh = BoundaryMesh2d::new(coords, elems, etags, faces, ftags);
+        let mesh = BoundaryMesh2d::new(&coords, &elems, &etags, &faces, &ftags);
 
         let tree = ObjectIndex::new(&mesh);
 
@@ -98,7 +98,7 @@ mod tests {
 
         let tri_tags = vec![1; 2 * n];
 
-        let msh = BoundaryMesh3d::new(coords, tris, tri_tags, Vec::new(), Vec::new());
+        let msh = BoundaryMesh3d::new(&coords, &tris, &tri_tags, &Vec::new(), &Vec::new());
         // msh.write_vtk("dbg.vtu", None, None);
 
         let tree = ObjectIndex::new(&msh);
@@ -148,11 +148,11 @@ mod tests {
                 if d > worst.0 {
                     worst.0 = d;
                     worst.1 = Some(pt_proj);
-                    println!("{pt:?} -> {pt_proj:?}, {d:e}");
+                    // println!("{pt:?} -> {pt_proj:?}, {d:e}");
                 }
                 assert!(f64::abs(pt_proj[i] - v) < 3e-10, "{} != {}", pt_proj[i], v);
             }
         }
-        println!("Time by projection: {:?}", start.elapsed() / num_proj);
+        // println!("Time by projection: {:?}", start.elapsed() / num_proj);
     }
 }

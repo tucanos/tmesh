@@ -108,8 +108,13 @@ impl PyExtrudedMesh2d {
 
     /// Get a copy of the vertices
     fn get_verts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        PyArray::from_vec(py, self.0.verts().flatten().cloned().collect())
-            .reshape([self.0.n_verts(), 3])
+        let mut res = Vec::with_capacity(3 * self.0.n_verts());
+        for v in self.0.verts() {
+            for &x in v.as_slice() {
+                res.push(x);
+            }
+        }
+        PyArray::from_vec(py, res).reshape([self.0.n_verts(), 3])
     }
 
     /// Number of prisms

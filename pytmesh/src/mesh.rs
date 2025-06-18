@@ -18,6 +18,7 @@ use tmesh::{
         BoundaryMesh2d, BoundaryMesh3d, Mesh, Mesh2d, Mesh3d, nonuniform_box_mesh,
         nonuniform_rectangle_mesh,
         partition::{HilbertPartitioner, KMeansPartitioner2d, KMeansPartitioner3d, RCMPartitioner},
+        read_stl,
     },
 };
 
@@ -77,34 +78,25 @@ macro_rules! create_mesh {
                 }
 
                 let coords = coords.as_slice()?;
-                let coords = coords
-                    .chunks($dim)
-                    .map(|p| {
-                        let mut vx = Vertex::<$dim>::zeros();
-                        vx.copy_from_slice(p);
-                        vx
-                    })
-                    .collect();
+                let coords = coords.chunks($dim).map(|p| {
+                    let mut vx = Vertex::<$dim>::zeros();
+                    vx.copy_from_slice(p);
+                    vx
+                });
 
                 let elems = elems.as_slice()?;
-                let elems = elems
-                    .chunks($cell_dim)
-                    .map(|x| x.try_into().unwrap())
-                    .collect();
+                let elems = elems.chunks($cell_dim).map(|x| x.try_into().unwrap());
 
                 let faces = faces.as_slice()?;
-                let faces = faces
-                    .chunks($face_dim)
-                    .map(|x| x.try_into().unwrap())
-                    .collect();
+                let faces = faces.chunks($face_dim).map(|x| x.try_into().unwrap());
 
-                Ok(Self($name::new(
-                    coords,
-                    elems,
-                    etags.to_vec().unwrap(),
-                    faces,
-                    ftags.to_vec().unwrap(),
-                )))
+                let mut res = $name::empty();
+
+                res.add_verts(coords);
+                res.add_elems(elems, etags.to_vec().unwrap().iter().cloned());
+                res.add_faces(faces, ftags.to_vec().unwrap().iter().cloned());
+
+                Ok(Self(res))
             }
 
             /// Number of vertices
@@ -114,8 +106,13 @@ macro_rules! create_mesh {
 
             /// Get a copy of the vertices
             fn get_verts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
-                PyArray::from_vec(py, self.0.verts().flatten().cloned().collect())
-                    .reshape([self.0.n_verts(), $dim])
+                let mut res = Vec::with_capacity($dim * self.0.n_verts());
+                for v in self.0.verts() {
+                    for &x in v.as_slice() {
+                        res.push(x);
+                    }
+                }
+                PyArray::from_vec(py, res).reshape([self.0.n_verts(), $dim])
             }
 
             /// Number of elements
@@ -125,7 +122,7 @@ macro_rules! create_mesh {
 
             /// Get a copy of the elements
             fn get_elems<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<usize>>> {
-                PyArray::from_vec(py, self.0.elems().flatten().cloned().collect())
+                PyArray::from_vec(py, self.0.elems().flatten().collect())
                     .reshape([self.0.n_elems(), $cell_dim])
             }
 
@@ -141,7 +138,7 @@ macro_rules! create_mesh {
 
             /// Get a copy of the faces
             fn get_faces<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<usize>>> {
-                PyArray::from_vec(py, self.0.faces().flatten().cloned().collect())
+                PyArray::from_vec(py, self.0.faces().flatten().collect())
                     .reshape([self.0.n_faces(), $face_dim])
             }
 
@@ -152,7 +149,7 @@ macro_rules! create_mesh {
 
             /// Fix the element & face orientation (if possible) and tag internal faces (if needed)
             fn fix(&mut self) -> PyResult<()> {
-                let all_faces = self.0.compute_faces();
+                let all_faces = self.0.all_faces();
                 self.0.fix_orientation(&all_faces);
                 self.0.tag_internal_faces(&all_faces);
                 self.0
@@ -442,8 +439,7 @@ impl PyBoundaryMesh3d {
     /// Read a stl file
     #[classmethod]
     pub fn read_stl(_cls: &Bound<'_, PyType>, file_name: String) -> PyResult<Self> {
-        let msh = BoundaryMesh3d::read_stl(&file_name)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let msh = read_stl(&file_name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok(Self(msh))
     }
 }

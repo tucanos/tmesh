@@ -80,8 +80,8 @@ where
                     .flat_map(|v| {
                         let i_elem = index.nearest_elem(&v);
                         let e = self.mesh.elem(i_elem);
-                        let ge = self.mesh.gelem(e);
-                        let x = Cell::<C>::bcoords(ge, &v);
+                        let ge = self.mesh.gelem(&e);
+                        let x = Cell::<C>::bcoords(&ge, &v);
                         assert!(
                             x.iter().all(|c| (-tol..1.0 + tol).contains(c)),
                             "{x:?}, bcoords = {x:?}"
@@ -100,7 +100,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        mesh::{box_mesh, rectangle_mesh, Mesh, Mesh2d, Mesh3d},
+        mesh::{box_mesh, rectangle_mesh, Mesh, Mesh2d, Mesh3d, MutMesh},
         Result, Vert2d, Vert3d,
     };
     use nalgebra::{Rotation2, Rotation3};
@@ -113,7 +113,7 @@ mod tests {
         let mesh = rectangle_mesh::<Mesh2d>(1.0, 9, 1.0, 9);
         let interp = Interpolator::new(&mesh, InterpolationMethod::Linear(0.0));
 
-        let fun = |p: &Vert2d| 1.0 * p[0] + 2.0 * p[1];
+        let fun = |p: Vert2d| 1.0 * p[0] + 2.0 * p[1];
         let f: Vec<f64> = mesh.verts().map(fun).collect();
 
         let rot = Rotation2::new(FRAC_PI_4);
@@ -126,7 +126,7 @@ mod tests {
         });
 
         let other = other.split().split().split();
-        let f_other = interp.interpolate(&f, other.verts().cloned());
+        let f_other = interp.interpolate(&f, other.verts());
 
         for (a, b) in other.verts().map(fun).zip(f_other.iter().copied()) {
             assert!(f64::abs(b - a) < 1e-10);
@@ -140,7 +140,7 @@ mod tests {
         let mesh = rectangle_mesh::<Mesh2d>(1.0, 17, 1.0, 17);
         let interp = Interpolator::new(&mesh, InterpolationMethod::Nearest);
 
-        let fun = |p: &Vert2d| 1.0 * p[0] + 2.0 * p[1];
+        let fun = |p: Vert2d| 1.0 * p[0] + 2.0 * p[1];
         let f: Vec<f64> = mesh.verts().map(fun).collect();
 
         let rot = Rotation2::new(FRAC_PI_4);
@@ -152,7 +152,7 @@ mod tests {
             *x = p + tmp;
         });
 
-        let f_other = interp.interpolate(&f, other.verts().cloned());
+        let f_other = interp.interpolate(&f, other.verts());
 
         for (a, b) in other.verts().map(fun).zip(f_other.iter().copied()) {
             assert!(f64::abs(b - a) < 0.5 * (1.0 + 2.0) / 16.0 + 1e-6);
@@ -166,7 +166,7 @@ mod tests {
         let mesh = box_mesh::<Mesh3d>(1.0, 9, 1.0, 9, 1.0, 9);
         let interp = Interpolator::new(&mesh, InterpolationMethod::Linear(0.0));
 
-        let fun = |p: &Vert3d| 1.0 * p[0] + 2.0 * p[1] + 3.0 * p[2];
+        let fun = |p: Vert3d| 1.0 * p[0] + 2.0 * p[1] + 3.0 * p[2];
 
         let f: Vec<f64> = mesh.verts().map(fun).collect();
 
@@ -179,7 +179,7 @@ mod tests {
             *x = p + tmp;
         });
 
-        let f_other = interp.interpolate(&f, other.verts().cloned());
+        let f_other = interp.interpolate(&f, other.verts());
 
         for (a, b) in other.verts().map(fun).zip(f_other.iter().copied()) {
             assert!(f64::abs(b - a) < 1e-10);
@@ -193,7 +193,7 @@ mod tests {
         let mesh = box_mesh::<Mesh3d>(1.0, 9, 1.0, 9, 1.0, 9);
         let interp = Interpolator::new(&mesh, InterpolationMethod::Linear(0.0));
 
-        let fun = |p: &Vert3d| 1.0 * p[0] + 2.0 * p[1] + 3.0 * p[2];
+        let fun = |p: Vert3d| 1.0 * p[0] + 2.0 * p[1] + 3.0 * p[2];
 
         let f: Vec<f64> = mesh.verts().map(fun).collect();
 
@@ -206,7 +206,7 @@ mod tests {
             *x = p + tmp;
         });
 
-        let f_other = interp.interpolate(&f, other.verts().cloned());
+        let f_other = interp.interpolate(&f, other.verts());
 
         for (a, b) in other.verts().map(fun).zip(f_other.iter().copied()) {
             assert!(f64::abs(b - a) < 0.5 * (1.0 + 2.0 + 3.0) / 8.0 + 1e-6);

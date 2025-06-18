@@ -10,16 +10,20 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use serde::Serialize;
 use std::io::{BufWriter, Write};
 
+/// Encoding for vtk files
 #[derive(Clone, Copy)]
 #[allow(dead_code)]
-pub(crate) enum Encoding {
+pub enum VTUEncoding {
+    /// Ascii
     Ascii,
+    /// Binary
     Binary,
 }
 
 #[derive(Serialize)]
 #[serde(rename = "VTKFile", rename_all = "PascalCase")]
-pub(crate) struct VTUFile {
+/// VTU file writer
+pub struct VTUFile {
     #[serde(rename = "@type")]
     grid_type: String,
     #[serde(rename = "@version")]
@@ -29,12 +33,15 @@ pub(crate) struct VTUFile {
     #[serde(rename = "@byte_order")]
     byte_order: String,
     unstructured_grid: UnstructuredGrid,
+    #[serde(skip_serializing)]
+    encoding: VTUEncoding,
 }
 
 impl VTUFile {
+    /// Create a vtu Mesh writer
     pub fn from_mesh<const D: usize, const C: usize, const F: usize, M: Mesh<D, C, F>>(
         mesh: &M,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self
     where
         Cell<C>: Simplex<C>,
@@ -52,12 +59,15 @@ impl VTUFile {
                     points: Points::from_verts(mesh.verts(), encoding),
                     cells: Cells::from_elems(mesh, encoding),
                     cell_data: CellData::from_etags(mesh.etags(), encoding),
+                    point_data: PointData::new(),
                 },
             },
+            encoding,
         }
     }
 
-    pub fn from_extruded_mesh(mesh: &ExtrudedMesh2d, encoding: Encoding) -> Self {
+    /// Create a vtu ExtrudedMesh2d writer
+    pub fn from_extruded_mesh(mesh: &ExtrudedMesh2d, encoding: VTUEncoding) -> Self {
         Self {
             grid_type: "UnstructuredGrid".to_string(),
             version: 0.1,
@@ -70,12 +80,15 @@ impl VTUFile {
                     points: Points::from_verts(mesh.verts(), encoding),
                     cells: Cells::from_prisms(mesh.prisms(), encoding),
                     cell_data: CellData::from_etags(mesh.prism_tags(), encoding),
+                    point_data: PointData::new(),
                 },
             },
+            encoding,
         }
     }
 
-    pub fn from_poly_mesh<const D: usize, M: PolyMesh<D>>(mesh: &M, encoding: Encoding) -> Self {
+    /// Create a vtu PolyMesh writer
+    pub fn from_poly_mesh<const D: usize, M: PolyMesh<D>>(mesh: &M, encoding: VTUEncoding) -> Self {
         Self {
             grid_type: "UnstructuredGrid".to_string(),
             version: 0.1,
@@ -88,11 +101,54 @@ impl VTUFile {
                     points: Points::from_verts(mesh.verts(), encoding),
                     cells: Cells::from_poly(mesh, encoding, 0.1),
                     cell_data: CellData::from_etags(mesh.etags(), encoding),
+                    point_data: PointData::new(),
                 },
             },
+            encoding,
         }
     }
 
+    /// Add cell data
+    pub fn add_cell_data<I: Iterator<Item = f64>>(
+        &mut self,
+        name: &str,
+        number_of_components: usize,
+        data: I,
+    ) {
+        self.unstructured_grid
+            .piece
+            .cell_data
+            .data_array
+            .push(DataArray::new_f64(
+                name,
+                number_of_components,
+                self.unstructured_grid.piece.number_of_points,
+                data,
+                self.encoding,
+            ))
+    }
+
+    /// Add point data
+    pub fn add_point_data<I: Iterator<Item = f64>>(
+        &mut self,
+        name: &str,
+        number_of_components: usize,
+        data: I,
+    ) {
+        self.unstructured_grid
+            .piece
+            .point_data
+            .data_array
+            .push(DataArray::new_f64(
+                name,
+                number_of_components,
+                self.unstructured_grid.piece.number_of_cells,
+                data,
+                self.encoding,
+            ))
+    }
+
+    /// Write the file
     pub fn export(&self, file_name: &str) -> Result<()> {
         let f = std::fs::File::create(file_name)?;
         let mut writer = BufWriter::new(f);
@@ -118,6 +174,7 @@ struct Piece {
     points: Points,
     cells: Cells,
     cell_data: CellData,
+    point_data: PointData,
 }
 
 #[derive(Serialize)]
@@ -127,14 +184,20 @@ struct Points {
 }
 
 impl Points {
-    fn from_verts<'a, const D: usize, I: ExactSizeIterator<Item = &'a Vertex<D>>>(
+    fn from_verts<const D: usize, I: ExactSizeIterator<Item = Vertex<D>>>(
         data: I,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self {
         let name = "Points";
         Self {
             data_array: match D {
-                3 => DataArray::new_f64(name, 3, 3 * data.len(), data.flatten().cloned(), encoding),
+                3 => DataArray::new_f64(
+                    name,
+                    3,
+                    3 * data.len(),
+                    data.flat_map(|x| [x[0], x[1], x[2]]),
+                    encoding,
+                ),
                 2 => DataArray::new_f64(
                     name,
                     3,
@@ -179,18 +242,18 @@ impl DataArray {
         number_of_components: usize,
         len: usize,
         data: I,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self {
         use std::fmt::Write;
         let (format, data) = match encoding {
-            Encoding::Ascii => (
+            VTUEncoding::Ascii => (
                 "ascii".to_string(),
                 data.fold(String::new(), |mut output, b| {
                     let _ = write!(output, "{b} ");
                     output
                 }),
             ),
-            Encoding::Binary => (
+            VTUEncoding::Binary => (
                 "binary".to_string(),
                 encode::<f64, _>(len, data.flat_map(|x| x.to_le_bytes())),
             ),
@@ -210,18 +273,18 @@ impl DataArray {
         number_of_components: usize,
         len: usize,
         data: I,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self {
         use std::fmt::Write;
         let (format, data) = match encoding {
-            Encoding::Ascii => (
+            VTUEncoding::Ascii => (
                 "ascii".to_string(),
                 data.fold(String::new(), |mut output, b| {
                     let _ = write!(output, "{b} ");
                     output
                 }),
             ),
-            Encoding::Binary => (
+            VTUEncoding::Binary => (
                 "binary".to_string(),
                 encode::<i64, _>(len, data.flat_map(|x| x.to_le_bytes())),
             ),
@@ -241,18 +304,18 @@ impl DataArray {
         number_of_components: usize,
         len: usize,
         data: I,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self {
         use std::fmt::Write;
         let (format, data) = match encoding {
-            Encoding::Ascii => (
+            VTUEncoding::Ascii => (
                 "ascii".to_string(),
                 data.fold(String::new(), |mut output, b| {
                     let _ = write!(output, "{b} ");
                     output
                 }),
             ),
-            Encoding::Binary => (
+            VTUEncoding::Binary => (
                 "binary".to_string(),
                 encode::<i16, _>(len, data.flat_map(|x| x.to_le_bytes())),
             ),
@@ -272,18 +335,18 @@ impl DataArray {
         number_of_components: usize,
         len: usize,
         data: I,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self {
         use std::fmt::Write;
         let (format, data) = match encoding {
-            Encoding::Ascii => (
+            VTUEncoding::Ascii => (
                 "ascii".to_string(),
                 data.fold(String::new(), |mut output, b| {
                     let _ = write!(output, "{b} ");
                     output
                 }),
             ),
-            Encoding::Binary => (
+            VTUEncoding::Binary => (
                 "binary".to_string(),
                 encode::<u8, _>(len, data.flat_map(|x| x.to_le_bytes())),
             ),
@@ -308,7 +371,7 @@ struct Cells {
 impl Cells {
     fn from_elems<const D: usize, const C: usize, const F: usize, M: Mesh<D, C, F>>(
         mesh: &M,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self
     where
         Cell<C>: Simplex<C>,
@@ -320,7 +383,7 @@ impl Cells {
             "connectivity",
             1,
             C * n,
-            mesh.elems().flatten().map(|&x| x as i64),
+            mesh.elems().flatten().map(|x| x as i64),
             encoding,
         );
 
@@ -344,7 +407,7 @@ impl Cells {
 
     fn from_prisms<'a, I: ExactSizeIterator<Item = &'a Prism>>(
         prisms: I,
-        encoding: Encoding,
+        encoding: VTUEncoding,
     ) -> Self {
         let n = prisms.len();
 
@@ -371,7 +434,7 @@ impl Cells {
 
     fn from_poly<const D: usize, M: PolyMesh<D>>(
         mesh: &M,
-        encoding: Encoding,
+        encoding: VTUEncoding,
         version: f64,
     ) -> Self {
         let n = mesh.n_elems();
@@ -540,7 +603,7 @@ struct CellData {
 }
 
 impl CellData {
-    fn from_etags<I: ExactSizeIterator<Item = Tag>>(data: I, encoding: Encoding) -> Self {
+    fn from_etags<I: ExactSizeIterator<Item = Tag>>(data: I, encoding: VTUEncoding) -> Self {
         let tags = DataArray::new_i16("tags", 1, data.len(), data, encoding);
 
         Self {
@@ -549,15 +612,29 @@ impl CellData {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "PascalCase")]
+struct PointData {
+    data_array: Vec<DataArray>,
+}
+
+impl PointData {
+    fn new() -> Self {
+        Self {
+            data_array: Vec::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Encoding, VTUFile};
+    use super::{VTUEncoding, VTUFile};
     use crate::mesh::{rectangle_mesh, Mesh2d};
 
     #[test]
     fn test_write_triangles() {
         let msh: Mesh2d = rectangle_mesh(1.0, 10, 2.0, 15);
-        let writer = VTUFile::from_mesh(&msh, Encoding::Binary);
+        let writer = VTUFile::from_mesh(&msh, VTUEncoding::Binary);
 
         writer.export("toto.vtu").unwrap();
     }
