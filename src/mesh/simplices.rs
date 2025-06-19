@@ -61,6 +61,10 @@ pub trait Simplex<const C: usize>: Sized {
 
     /// Barycentric coordinates
     fn bcoords<const D: usize>(ge: &[Vertex<D>; C], v: &Vertex<D>) -> [f64; C];
+
+    /// Gamma quality measure, ratio of inscribed radius to circumradius
+    /// normalized to be between 0 and 1
+    fn gamma<const D: usize>(ge: &[Vertex<D>; C]) -> f64;
 }
 
 fn is_circ_perm<const N: usize>(a: &[usize; N], b: &[usize; N]) -> bool {
@@ -122,6 +126,10 @@ impl Simplex<0> for [usize; 0] {
     fn bcoords<const D: usize>(_ge: &[Vertex<D>; 0], _v: &Vertex<D>) -> [f64; 0] {
         unreachable!()
     }
+
+    fn gamma<const D: usize>(_ge: &[Vertex<D>; 0]) -> f64 {
+        unreachable!()
+    }
 }
 
 impl Simplex<1> for Node {
@@ -169,6 +177,10 @@ impl Simplex<1> for Node {
 
     fn bcoords<const D: usize>(_ge: &[Vertex<D>; 1], _v: &Vertex<D>) -> [f64; 1] {
         unreachable!()
+    }
+
+    fn gamma<const D: usize>(_ge: &[Vertex<D>; 1]) -> f64 {
+        1.0
     }
 }
 
@@ -242,6 +254,10 @@ impl Simplex<2> for Edge {
 
     fn bcoords<const D: usize>(_ge: &[Vertex<D>; 2], _v: &Vertex<D>) -> [f64; 2] {
         unreachable!()
+    }
+
+    fn gamma<const D: usize>(_ge: &[Vertex<D>; 2]) -> f64 {
+        1.0
     }
 }
 
@@ -349,6 +365,35 @@ impl Simplex<3> for Triangle {
             [1.0 - beta - gamma, beta, gamma]
         }
     }
+
+    fn gamma<const D: usize>(ge: &[Vertex<D>; 3]) -> f64 {
+        let mut a = ge[2] - ge[1];
+        let mut b = ge[0] - ge[2];
+        let mut c = ge[1] - ge[0];
+
+        a.normalize_mut();
+        b.normalize_mut();
+        c.normalize_mut();
+
+        let cross_norm = |e1: &Vertex<D>, e2: &Vertex<D>| {
+            if D == 2 {
+                (e1[0] * e2[1] - e1[1] * e2[0]).abs()
+            } else {
+                let n = e1.cross(e2);
+                n.norm()
+            }
+        };
+        let sina = cross_norm(&b, &c);
+        let sinb = cross_norm(&a, &c);
+        let sinc = cross_norm(&a, &b);
+
+        let tmp = sina + sinb + sinc;
+        if tmp < 1e-12 {
+            0.0
+        } else {
+            4.0 * sina * sinb * sinc / tmp
+        }
+    }
 }
 
 pub(crate) const TETRA_FACES: [Triangle; 4] = [[1, 2, 3], [2, 0, 3], [0, 1, 3], [0, 2, 1]];
@@ -436,6 +481,69 @@ impl Simplex<4> for Tetrahedron {
         let decomp = a.lu();
         let x = decomp.solve(&b).unwrap();
         [x[0], x[1], x[2], x[3]]
+    }
+
+    fn gamma<const D: usize>(ge: &[Vertex<D>; 4]) -> f64 {
+        let vol = Self::vol(ge);
+        if vol < f64::EPSILON {
+            return 0.0;
+        }
+
+        let a = ge[1] - ge[0];
+        let b = ge[2] - ge[0];
+        let c = ge[3] - ge[0];
+
+        let aa = ge[3] - ge[2];
+        let bb = ge[3] - ge[1];
+        let cc = ge[2] - ge[1];
+
+        let la = a.norm_squared();
+        let lb = b.norm_squared();
+        let lc = c.norm_squared();
+        let laa = aa.norm_squared();
+        let lbb = bb.norm_squared();
+        let lcc = cc.norm_squared();
+
+        let lalaa = (la * laa).sqrt();
+        let lblbb = (lb * lbb).sqrt();
+        let lclcc = (lc * lcc).sqrt();
+
+        let tmp = (lalaa + lblbb + lclcc)
+            * (lalaa + lblbb - lclcc)
+            * (lalaa - lblbb + lclcc)
+            * (-lalaa + lblbb + lclcc);
+
+        // This happens when the 4 points are (nearly) co-planar
+        // => R is actually undetermined but the quality is (close to) zero
+        if tmp < f64::EPSILON {
+            return 0.0;
+        }
+
+        let r = tmp.sqrt() / 24.0 / vol;
+
+        let s1 = Face::<3>::vol(&[
+            ge[TETRA_FACES[0][0]],
+            ge[TETRA_FACES[0][1]],
+            ge[TETRA_FACES[0][2]],
+        ]);
+        let s2 = Face::<3>::vol(&[
+            ge[TETRA_FACES[1][0]],
+            ge[TETRA_FACES[1][1]],
+            ge[TETRA_FACES[1][2]],
+        ]);
+        let s3 = Face::<3>::vol(&[
+            ge[TETRA_FACES[2][0]],
+            ge[TETRA_FACES[2][1]],
+            ge[TETRA_FACES[2][2]],
+        ]);
+        let s4 = Face::<3>::vol(&[
+            ge[TETRA_FACES[3][0]],
+            ge[TETRA_FACES[3][1]],
+            ge[TETRA_FACES[3][2]],
+        ]);
+        let rho = 9.0 * vol / (s1 + s2 + s3 + s4);
+
+        rho / r
     }
 }
 

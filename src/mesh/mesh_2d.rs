@@ -261,4 +261,38 @@ mod tests {
         let vol = msh.gelems().map(|ge| Triangle::vol(&ge)).sum::<f64>();
         assert_delta!(vol, 1.0, 1e-10);
     }
+
+    #[test]
+    fn test_skewness_2d() {
+        let mesh = rectangle_mesh::<Mesh2d>(1.0, 3, 1.0, 3).random_shuffle();
+
+        let all_faces = mesh.all_faces();
+        let count = mesh
+            .face_skewnesses(&all_faces)
+            .map(|(_, _, s)| assert!(s.abs() < 1e-3))
+            .count();
+        assert_eq!(count, 8);
+    }
+
+    #[test]
+    fn test_edge_ratio_2d() {
+        let mesh = rectangle_mesh::<Mesh2d>(1.0, 3, 1.0, 3).random_shuffle();
+
+        let count = mesh
+            .edge_length_ratios()
+            .map(|s| assert!((s - std::f64::consts::SQRT_2) < 1e-6))
+            .count();
+        assert_eq!(count, 8);
+    }
+
+    #[test]
+    fn test_gamma_2d() {
+        let mesh = rectangle_mesh::<Mesh2d>(1.0, 3, 1.0, 3).random_shuffle();
+
+        let count = mesh
+            .elem_gammas()
+            .map(|s| assert!((s - 0.8284).abs() < 1e-4))
+            .count();
+        assert_eq!(count, 8);
+    }
 }

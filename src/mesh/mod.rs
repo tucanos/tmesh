@@ -1308,6 +1308,55 @@ where
         }
         res
     }
+
+    /// Compute the skewness for all internal faces in the mesh
+    /// Skewness is the normalized distance between a line that connects two
+    /// adjacent cell centroids and the distance from that line to the shared
+    /// face’s center.
+    fn face_skewnesses(
+        &self,
+        all_faces: &FxHashMap<Face<F>, [usize; 3]>,
+    ) -> impl Iterator<Item = (usize, usize, f64)> {
+        all_faces
+            .iter()
+            .filter(|(_, &[_, i0, i1])| i0 != usize::MAX && i1 != usize::MAX)
+            .map(|(f, &[_, i0, i1])| {
+                let fc = cell_center(&self.gface(f));
+                let ec0 = cell_center(&self.gelem(&self.elem(i0)));
+                let ec1 = cell_center(&self.gelem(&self.elem(i1)));
+                let e2f = fc - ec0;
+                let l_e2f = e2f.norm();
+                let e2e = ec1 - ec0;
+                let l_e2e = e2e.norm();
+                let tmp = e2e.dot(&e2f) / (l_e2e * l_e2f);
+                let ang = f64::acos(tmp.clamp(-1., 1.));
+                let s = l_e2f * ang.sin();
+                (i0, i1, s / l_e2e)
+            })
+    }
+
+    /// Compute the edge ratio for all the elements in the mesh
+    #[must_use]
+    fn edge_length_ratios(&self) -> impl ExactSizeIterator<Item = f64> + '_ {
+        let elem_to_edges = Cell::<C>::edges();
+        self.elems().map(move |e| {
+            let mut l_min = f64::MAX;
+            let mut l_max = 0.0_f64;
+            for &[i0, i1] in &elem_to_edges {
+                let l = (self.vert(e[i1]) - self.vert(e[i0])).norm();
+                l_min = l_min.min(l);
+                l_max = l_max.max(l);
+            }
+            l_max / l_min
+        })
+    }
+
+    /// Compute the ratio of inscribed radius to circumradius
+    /// (normalized to be between 0 and 1) for all the elements in the mesh
+    #[must_use]
+    fn elem_gammas(&self) -> impl ExactSizeIterator<Item = f64> + '_ {
+        self.gelems().map(|ge| Cell::<C>::gamma(&ge))
+    }
 }
 
 /// D-dimensional mesh containing simplices with C nodes

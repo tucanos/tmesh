@@ -381,4 +381,40 @@ mod tests {
         let vol = msh.gelems().map(|ge| Tetrahedron::vol(&ge)).sum::<f64>();
         assert_delta!(vol, 1.0, 1e-10);
     }
+
+    #[test]
+    fn test_skewness_3d() {
+        let mesh = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+
+        let all_faces = mesh.all_faces();
+        let count = mesh
+            .face_skewnesses(&all_faces)
+            .map(|(_, _, s)| assert!(s < 0.5, "{s}"))
+            .count();
+        assert_eq!(count, 72);
+    }
+
+    #[test]
+    fn test_edge_ratio_3d() {
+        let mesh = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+
+        let count = mesh
+            .edge_length_ratios()
+            .map(|s| assert!(s < 3.0_f64.sqrt() + 1e-6))
+            .count();
+        assert_eq!(count, 48);
+    }
+
+    #[test]
+    fn test_gamma_3d() {
+        let mesh = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+
+        let (gamma_min, gamma_max) = mesh
+            .elem_gammas()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |a, b| {
+                (a.0.min(b), a.1.max(b))
+            });
+        assert!((gamma_min - 0.717).abs() < 1e-3);
+        assert!((gamma_max - 0.717).abs() < 1e-3);
+    }
 }

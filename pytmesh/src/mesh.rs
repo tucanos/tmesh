@@ -400,6 +400,45 @@ macro_rules! create_mesh {
 
                 PyArray::from_vec(py, res).reshape([verts.shape()[0], m])
             }
+
+            // Compute the skewness for all internal faces in the mesh
+            /// Skewness is the normalized distance between a line that connects two
+            /// adjacent cell centroids and the distance from that line to the shared
+            /// face’s center.
+            pub fn face_skewnesses<'py>(
+                &self,
+                py: Python<'py>,
+            ) -> PyResult<(Bound<'py, PyArray2<usize>>, Bound<'py, PyArray1<f64>>)> {
+                let all_faces = self.0.all_faces();
+                let res = self.0.face_skewnesses(&all_faces);
+
+                let mut ids = Vec::new();
+                let mut vals = Vec::new();
+                for (i, j, v) in res {
+                    ids.push(i);
+                    ids.push(j);
+                    vals.push(v);
+                }
+                Ok((
+                    PyArray::from_vec(py, ids).reshape([vals.len(), 2])?,
+                    PyArray::from_vec(py, vals),
+                ))
+            }
+
+            /// Compute the edge ratio for all the elements in the mesh
+            #[must_use]
+            pub fn edge_length_ratios<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+                let res = self.0.edge_length_ratios().collect::<Vec<_>>();
+                PyArray::from_vec(py, res)
+            }
+
+            /// Compute the ratio of inscribed radius to circumradius
+            /// (normalized to be between 0 and 1) for all the elements in the mesh
+            #[must_use]
+            pub fn elem_gammas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+                let res = self.0.elem_gammas().collect::<Vec<_>>();
+                PyArray::from_vec(py, res)
+            }
         }
     };
 }
