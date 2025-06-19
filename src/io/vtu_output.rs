@@ -122,7 +122,7 @@ impl VTUFile {
             .push(DataArray::new_f64(
                 name,
                 number_of_components,
-                self.unstructured_grid.piece.number_of_points,
+                self.unstructured_grid.piece.number_of_cells,
                 data,
                 self.encoding,
             ))
@@ -142,7 +142,7 @@ impl VTUFile {
             .push(DataArray::new_f64(
                 name,
                 number_of_components,
-                self.unstructured_grid.piece.number_of_cells,
+                self.unstructured_grid.piece.number_of_points,
                 data,
                 self.encoding,
             ))
