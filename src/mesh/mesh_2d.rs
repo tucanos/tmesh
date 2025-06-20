@@ -1,6 +1,6 @@
 //! Triangle meshes in 2d
 use super::{Cell, Edge, Face, Mesh, MutMesh, Simplex, Triangle};
-use crate::{impl_mesh_simple, Tag, Vert2d, Vertex};
+use crate::{mesh::GenericMesh, Tag, Vert2d, Vertex};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// Create a `Mesh<2, 3, 2>` of a `lx` by `ly` rectangle by splitting a `nx` by `ny`
@@ -65,15 +65,7 @@ pub fn nonuniform_rectangle_mesh<M: Mesh<2, 3, 2>>(x: &[f64], y: &[f64]) -> M {
 }
 
 /// Triangle mesh in 2d
-pub struct Mesh2d {
-    verts: Vec<Vert2d>,
-    elems: Vec<Triangle>,
-    etags: Vec<Tag>,
-    faces: Vec<Edge>,
-    ftags: Vec<Tag>,
-}
-
-impl_mesh_simple!(Mesh2d, 2, 3, 2);
+pub type Mesh2d=GenericMesh<Vert2d, Triangle, Edge>;
 
 #[cfg(test)]
 mod tests {
