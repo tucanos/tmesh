@@ -1,8 +1,7 @@
 //! Tetrahedron meshes in 3d
 use super::{Mesh, MutMesh, Tetrahedron, Triangle};
 use crate::{
-    impl_mesh_simple,
-    mesh::{Cell, Face, Simplex},
+    mesh::{Cell, Face, GenericMesh, Simplex},
     Tag, Vert3d, Vertex,
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -135,7 +134,7 @@ pub fn nonuniform_box_mesh<M: Mesh<3, 4, 3>>(x: &[f64], y: &[f64], z: &[f64]) ->
     // res.fix_orientation(&faces);
     res
 }
-
+/*
 /// Tetrahedron mesh in 3d
 pub struct Mesh3d {
     verts: Vec<Vert3d>,
@@ -146,6 +145,9 @@ pub struct Mesh3d {
 }
 
 impl_mesh_simple!(Mesh3d, 3, 4, 3);
+
+*/
+pub type Mesh3d = GenericMesh<Vert3d, Tetrahedron, Triangle>;
 
 #[cfg(test)]
 mod tests {

@@ -1,19 +1,11 @@
 //! Boundary of `Mesh3d`
 use super::{Cell, Edge, Face, Mesh, MutMesh, Simplex, Triangle};
-use crate::{impl_mesh_simple, Result, Tag, Vert3d, Vertex};
+use crate::{mesh::GenericMesh, Result, Tag, Vert3d, Vertex};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::fs::OpenOptions;
 
 /// Triangle mesh in 3d
-pub struct BoundaryMesh3d {
-    verts: Vec<Vert3d>,
-    elems: Vec<Triangle>,
-    etags: Vec<Tag>,
-    faces: Vec<Edge>,
-    ftags: Vec<Tag>,
-}
-
-impl_mesh_simple!(BoundaryMesh3d, 3, 3, 2);
+pub type BoundaryMesh3d = GenericMesh<Vert3d, Triangle, Edge>;
 
 /// Read a stl file
 pub fn read_stl<M: Mesh<3, 3, 2>>(file_name: &str) -> Result<M> {
