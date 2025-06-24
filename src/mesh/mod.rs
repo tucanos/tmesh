@@ -1384,9 +1384,7 @@ where
     fn ftags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_;
 }
 
-pub struct GenericMesh<VERT, CELL, FACE> {
-    verts: Vec<VERT>,
-    elems: Vec<CELL>,
+/// Generic meshes implemented with Vecs
     etags: Vec<Tag>,
     faces: Vec<FACE>,
     ftags: Vec<Tag>,

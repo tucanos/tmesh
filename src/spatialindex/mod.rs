@@ -35,7 +35,7 @@ pub use parry::ObjectIndex;
 mod tests {
     use nalgebra::SVector;
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use std::{f64::consts::PI, time::Instant};
+    use std::f64::consts::PI;
 
     use crate::{
         mesh::{BoundaryMesh2d, BoundaryMesh3d, Mesh},
@@ -131,7 +131,7 @@ mod tests {
 
         let mut rng = StdRng::seed_from_u64(0);
         let mut worst = (0., None);
-        let start = Instant::now();
+        // let start = Instant::now();
         let num_proj = 10000;
         for _ in 0..num_proj {
             let tmp = SVector::<f64, 3>::from_fn(|_, _| rng.random());

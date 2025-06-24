@@ -1,7 +1,6 @@
 //! Boundary of `Mesh3d`
-use super::{Cell, Edge, Face, Mesh, MutMesh, Simplex, Triangle};
-use crate::{mesh::GenericMesh, Result, Tag, Vert3d, Vertex};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use super::{Edge, Mesh, Triangle};
+use crate::{mesh::GenericMesh, Result, Vert3d};
 use std::fs::OpenOptions;
 
 /// Triangle mesh in 3d

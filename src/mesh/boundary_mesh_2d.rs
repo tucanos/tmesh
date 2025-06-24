@@ -1,10 +1,9 @@
 //! Boundary of `Mesh2d`
-use super::{Cell, Edge, Face, Mesh, MutMesh, Node, Simplex};
-use crate::{mesh::GenericMesh, Tag, Vert2d, Vertex};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use super::{Edge, Node};
+use crate::{mesh::GenericMesh, Vert2d};
 
 /// Edge mesh in 2d
-pub type BoundaryMesh2d = GenericMesh<Vert2d, Edge, Node>;
+pub type BoundaryMesh2d = GenericMesh<2, 3, 2>;
 
 #[cfg(test)]
 mod tests {
