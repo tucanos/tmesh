@@ -1385,20 +1385,18 @@ where
 }
 
 /// Generic meshes implemented with Vecs
+pub struct GenericMesh<const D: usize, const C: usize, const F: usize> {
+    verts: Vec<Vertex<D>>,
+    elems: Vec<Cell<C>>,
     etags: Vec<Tag>,
-    faces: Vec<FACE>,
+    faces: Vec<Face<F>>,
     ftags: Vec<Tag>,
 }
 
-impl<const DIM: usize, const CDIM: usize, const FDIM: usize, VERT, CELL, FACE> Mesh<DIM, CDIM, FDIM>
-    for GenericMesh<VERT, CELL, FACE>
+impl<const D: usize, const C: usize, const F: usize> Mesh<D, C, F> for GenericMesh<D, C, F>
 where
-    Vertex<DIM>: From<VERT>,
-    Cell<CDIM>: From<CELL> + Simplex<CDIM>,
-    Face<FDIM>: From<FACE> + Simplex<FDIM>,
-    VERT: Copy + Sync + Send + From<Vertex<DIM>>,
-    CELL: Copy + Sync + Send + From<Cell<CDIM>> + Simplex<CDIM>,
-    FACE: Copy + Sync + Send + From<Face<FDIM>> + Simplex<FDIM>,
+    Cell<C>: Simplex<C>,
+    Face<F>: Simplex<F>,
 {
     fn empty() -> Self {
         Self {
@@ -1414,40 +1412,40 @@ where
         self.verts.len()
     }
 
-    fn vert(&self, i: usize) -> Vertex<DIM> {
-        self.verts[i].into()
+    fn vert(&self, i: usize) -> Vertex<D> {
+        self.verts[i]
     }
 
-    fn verts(&self) -> impl ExactSizeIterator<Item = Vertex<DIM>> + Clone + '_ {
-        self.verts.iter().cloned().map(|x| x.into())
+    fn verts(&self) -> impl ExactSizeIterator<Item = Vertex<D>> + Clone + '_ {
+        self.verts.iter().cloned()
     }
 
-    fn par_verts(&self) -> impl IndexedParallelIterator<Item = Vertex<DIM>> + Clone + '_ {
-        self.verts.par_iter().cloned().map(|x| x.into())
+    fn par_verts(&self) -> impl IndexedParallelIterator<Item = Vertex<D>> + Clone + '_ {
+        self.verts.par_iter().cloned()
     }
 
-    fn add_verts<I: ExactSizeIterator<Item = Vertex<DIM>>>(&mut self, v: I) {
-        self.verts.extend(v.map(|x| VERT::from(x)));
+    fn add_verts<I: ExactSizeIterator<Item = Vertex<D>>>(&mut self, v: I) {
+        self.verts.extend(v);
     }
 
     fn n_elems(&self) -> usize {
         self.elems.len()
     }
 
-    fn elem(&self, i: usize) -> Cell<CDIM> {
-        self.elems[i].into()
+    fn elem(&self, i: usize) -> Cell<C> {
+        self.elems[i]
     }
 
     fn invert_elem(&mut self, i: usize) {
         self.elems[i].invert();
     }
 
-    fn elems(&self) -> impl ExactSizeIterator<Item = Cell<CDIM>> + Clone + '_ {
-        self.elems.iter().cloned().map(|x| x.into())
+    fn elems(&self) -> impl ExactSizeIterator<Item = Cell<C>> + Clone + '_ {
+        self.elems.iter().cloned()
     }
 
-    fn par_elems(&self) -> impl IndexedParallelIterator<Item = Cell<CDIM>> + Clone + '_ {
-        self.elems.par_iter().cloned().map(|x| x.into())
+    fn par_elems(&self) -> impl IndexedParallelIterator<Item = Cell<C>> + Clone + '_ {
+        self.elems.par_iter().cloned()
     }
 
     fn etag(&self, i: usize) -> Tag {
@@ -1466,12 +1464,12 @@ where
         self.etags.par_iter().cloned()
     }
 
-    fn add_elems<I1: ExactSizeIterator<Item = Cell<CDIM>>, I2: ExactSizeIterator<Item = Tag>>(
+    fn add_elems<I1: ExactSizeIterator<Item = Cell<C>>, I2: ExactSizeIterator<Item = Tag>>(
         &mut self,
         elems: I1,
         etags: I2,
     ) {
-        self.elems.extend(elems.map(|x| CELL::from(x)));
+        self.elems.extend(elems);
         self.etags.extend(etags);
     }
 
@@ -1480,14 +1478,14 @@ where
         self.etags.clear();
     }
 
-    fn add_elems_and_tags<I: ExactSizeIterator<Item = (Cell<CDIM>, Tag)>>(
+    fn add_elems_and_tags<I: ExactSizeIterator<Item = (Cell<C>, Tag)>>(
         &mut self,
         elems_and_tags: I,
     ) {
         self.elems.reserve(elems_and_tags.len());
         self.etags.reserve(elems_and_tags.len());
         for (e, t) in elems_and_tags {
-            self.elems.push(e.into());
+            self.elems.push(e);
             self.etags.push(t);
         }
     }
@@ -1496,20 +1494,20 @@ where
         self.faces.len()
     }
 
-    fn face(&self, i: usize) -> Face<FDIM> {
-        self.faces[i].into()
+    fn face(&self, i: usize) -> Face<F> {
+        self.faces[i]
     }
 
     fn invert_face(&mut self, i: usize) {
         self.faces[i].invert();
     }
 
-    fn faces(&self) -> impl ExactSizeIterator<Item = Face<FDIM>> + Clone + '_ {
-        self.faces.iter().cloned().map(|x| x.into())
+    fn faces(&self) -> impl ExactSizeIterator<Item = Face<F>> + Clone + '_ {
+        self.faces.iter().cloned()
     }
 
-    fn par_faces(&self) -> impl IndexedParallelIterator<Item = Face<FDIM>> + Clone + '_ {
-        self.faces.par_iter().cloned().map(|x| x.into())
+    fn par_faces(&self) -> impl IndexedParallelIterator<Item = Face<F>> + Clone + '_ {
+        self.faces.par_iter().cloned()
     }
 
     fn ftag(&self, i: usize) -> Tag {
@@ -1524,12 +1522,12 @@ where
         self.ftags.par_iter().cloned()
     }
 
-    fn add_faces<I1: ExactSizeIterator<Item = Face<FDIM>>, I2: ExactSizeIterator<Item = Tag>>(
+    fn add_faces<I1: ExactSizeIterator<Item = Face<F>>, I2: ExactSizeIterator<Item = Tag>>(
         &mut self,
         faces: I1,
         ftags: I2,
     ) {
-        self.faces.extend(faces.map(|x| FACE::from(x)));
+        self.faces.extend(faces);
         self.ftags.extend(ftags);
     }
 
@@ -1538,45 +1536,38 @@ where
         self.ftags.clear();
     }
 
-    fn add_faces_and_tags<I: ExactSizeIterator<Item = (Face<FDIM>, Tag)>>(
+    fn add_faces_and_tags<I: ExactSizeIterator<Item = (Face<F>, Tag)>>(
         &mut self,
         faces_and_tags: I,
     ) {
         self.faces.reserve(faces_and_tags.len());
         self.ftags.reserve(faces_and_tags.len());
         for (e, t) in faces_and_tags {
-            self.faces.push(e.into());
+            self.faces.push(e);
             self.ftags.push(t);
         }
     }
 }
 
-impl<const DIM: usize, const CDIM: usize, const FDIM: usize, VERT, CELL, FACE>
-    MutMesh<DIM, CDIM, FDIM> for GenericMesh<VERT, CELL, FACE> where
-    Vertex<DIM>: From<VERT>,
-    Cell<CDIM>: From<CELL> + Simplex<CDIM>,
-    Face<FDIM>: From<FACE> + Simplex<FDIM>,
-    VERT: Copy + Sync + Send + From<Vertex<DIM>>,
-    CELL: Copy + Sync + Send + From<Cell<CDIM>> + Simplex<CDIM>,
-    FACE: Copy + Sync + Send + From<Face<FDIM>> + Simplex<FDIM>,
-    for<'a> &'a mut Cell<CDIM>: From<&'a mut CELL>,
-    for<'a> &'a mut Vertex<DIM>: From<&'a mut VERT>,
-    for<'a> &'a mut Face<FDIM>: From<&'a mut FACE>,
+impl<const D: usize, const C: usize, const F: usize> MutMesh<D, C, F> for GenericMesh<D, C, F>
+where
+    Cell<C>: Simplex<C>,
+    Face<F>: Simplex<F>,
 {
-    fn verts_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Vertex<DIM>> + '_ {
-        self.verts.iter_mut().map(|x| x.into())
+    fn verts_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Vertex<D>> + '_ {
+        self.verts.iter_mut()
     }
 
-    fn elems_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Cell<CDIM>> + '_ {
-        self.elems.iter_mut().map(|x| x.into())
+    fn elems_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Cell<C>> + '_ {
+        self.elems.iter_mut()
     }
 
     fn etags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_ {
         self.etags.iter_mut()
     }
 
-    fn faces_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Face<FDIM>> + '_ {
-        self.faces.iter_mut().map(|x| x.into())
+    fn faces_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Face<F>> + '_ {
+        self.faces.iter_mut()
     }
 
     fn ftags_mut(&mut self) -> impl ExactSizeIterator<Item = &mut Tag> + '_ {
