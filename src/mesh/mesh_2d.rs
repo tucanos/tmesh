@@ -1,6 +1,8 @@
 //! Triangle meshes in 2d
-use super::{Edge, Mesh, Triangle};
-use crate::{mesh::GenericMesh, Vert2d};
+use crate::{
+    mesh::{GenericMesh, Mesh},
+    Vert2d,
+};
 
 /// Create a `Mesh<2, 3, 2>` of a `lx` by `ly` rectangle by splitting a `nx` by `ny`
 /// uniform structured grid
@@ -64,7 +66,7 @@ pub fn nonuniform_rectangle_mesh<M: Mesh<2, 3, 2>>(x: &[f64], y: &[f64]) -> M {
 }
 
 /// Triangle mesh in 2d
-pub type Mesh2d = GenericMesh<Vert2d, Triangle, Edge>;
+pub type Mesh2d = GenericMesh<2, 3, 2>;
 
 #[cfg(test)]
 mod tests {

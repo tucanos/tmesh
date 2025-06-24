@@ -1,6 +1,8 @@
 //! Tetrahedron meshes in 3d
-use super::{Mesh, Tetrahedron, Triangle};
-use crate::{mesh::GenericMesh, Vert3d};
+use crate::{
+    mesh::{GenericMesh, Mesh},
+    Vert3d,
+};
 
 /// Create a `Mesh<3, 4, 3>` of a `lx` by `ly` by `lz` box by splitting a `nx` by `ny` by `nz`
 /// uniform structured grid
@@ -132,7 +134,7 @@ pub fn nonuniform_box_mesh<M: Mesh<3, 4, 3>>(x: &[f64], y: &[f64], z: &[f64]) ->
 }
 
 /// Tetrahedron mesh in 3d
-pub type Mesh3d = GenericMesh<Vert3d, Tetrahedron, Triangle>;
+pub type Mesh3d = GenericMesh<3, 4, 3>;
 
 #[cfg(test)]
 mod tests {

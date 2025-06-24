@@ -1,9 +1,8 @@
 //! Boundary of `Mesh2d`
-use super::{Edge, Node};
-use crate::{mesh::GenericMesh, Vert2d};
+use crate::mesh::GenericMesh;
 
 /// Edge mesh in 2d
-pub type BoundaryMesh2d = GenericMesh<2, 3, 2>;
+pub type BoundaryMesh2d = GenericMesh<2, 2, 1>;
 
 #[cfg(test)]
 mod tests {

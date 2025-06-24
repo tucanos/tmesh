@@ -1,10 +1,12 @@
 //! Boundary of `Mesh3d`
-use super::{Edge, Mesh, Triangle};
-use crate::{mesh::GenericMesh, Result, Vert3d};
+use crate::{
+    mesh::{GenericMesh, Mesh},
+    Result, Vert3d,
+};
 use std::fs::OpenOptions;
 
 /// Triangle mesh in 3d
-pub type BoundaryMesh3d = GenericMesh<Vert3d, Triangle, Edge>;
+pub type BoundaryMesh3d = GenericMesh<3, 3, 2>;
 
 /// Read a stl file
 pub fn read_stl<M: Mesh<3, 3, 2>>(file_name: &str) -> Result<M> {
