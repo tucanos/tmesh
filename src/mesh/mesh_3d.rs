@@ -143,7 +143,7 @@ mod tests {
         mesh::{
             bandwidth, box_mesh, cell_center,
             partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
-            BoundaryMesh3d, Mesh, Mesh3d, Simplex, Tetrahedron, Triangle,
+            BoundaryMesh3d, Mesh, Mesh3d, MutMesh, Simplex, Tetrahedron, Triangle,
         },
         Vert3d,
     };
@@ -405,5 +405,24 @@ mod tests {
             });
         assert!((gamma_min - 0.717).abs() < 1e-3);
         assert!((gamma_max - 0.717).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_add_3d() {
+        let mut mesh1 = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+        assert_eq!(mesh1.n_tagged_faces(6), 8);
+        assert_eq!(mesh1.n_tagged_faces(11), 0);
+
+        let mut mesh2 = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+        mesh2
+            .verts_mut()
+            .for_each(|x| *x += Vert3d::new(1.0, 0.5, 0.5));
+        mesh2.ftags_mut().for_each(|t| *t += 10);
+
+        mesh1.add(&mesh2, |_| true, |_| true, Some(1e-12));
+
+        assert_eq!(mesh1.n_verts(), 2 * mesh2.n_verts() - 4);
+        assert_eq!(mesh1.n_tagged_faces(6), 8);
+        assert_eq!(mesh1.n_tagged_faces(11), 8);
     }
 }

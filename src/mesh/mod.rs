@@ -57,6 +57,7 @@ pub use to_simplices::{hex2tets, pri2tets, pyr2tets, qua2tris};
 use crate::{
     graph::CSRGraph,
     io::{VTUEncoding, VTUFile},
+    spatialindex::PointIndex,
     Error, Result, Tag, Vertex,
 };
 use log::debug;
@@ -1358,6 +1359,157 @@ where
     #[must_use]
     fn elem_gammas(&self) -> impl ExactSizeIterator<Item = f64> + '_ {
         self.gelems().map(|ge| Cell::<C>::gamma(&ge))
+    }
+
+    /// Get the bounding box
+    #[must_use]
+    fn bounding_box(&self) -> (Vertex<D>, Vertex<D>) {
+        let mut mini = self.verts().next().unwrap();
+        let mut maxi = mini;
+        for p in self.verts() {
+            for j in 0..D {
+                mini[j] = f64::min(mini[j], p[j]);
+                maxi[j] = f64::max(maxi[j], p[j]);
+            }
+        }
+        (mini, maxi)
+    }
+
+    /// Get the number of faces with a given tag
+    #[must_use]
+    fn n_tagged_faces(&self, tag: Tag) -> usize {
+        self.ftags().filter(|&t| t == tag).count()
+    }
+
+    /// Return a bool vector that indicates wether a vertex in on a face
+    #[must_use]
+    fn boundary_flag(&self) -> Vec<bool> {
+        let mut res = vec![false; self.n_verts()];
+        self.faces().flatten().for_each(|i| res[i] = true);
+        res
+    }
+
+    /// Add vertices, elements and faces from another mesh according to their tag
+    ///   - only the elements with a tag t such that `element_filter(t)` is true are inserted
+    ///   - among the faces belonging to these elements, only those with a tag such that `face_filter` is true are inserted
+    ///   - if `merge_tol` is not None, vertices on the boundaries of `self` and `other` are merged if closer than the tolerance.
+    ///
+    /// NB: Some boundary faces in `self` or `other` may no longer be boundary faces in the result
+    fn add<F1, F2>(
+        &mut self,
+        other: &Self,
+        mut elem_filter: F1,
+        mut face_filter: F2,
+        merge_tol: Option<f64>,
+    ) -> (Vec<usize>, Vec<usize>, Vec<usize>)
+    where
+        F1: FnMut(Tag) -> bool,
+        F2: FnMut(Tag) -> bool,
+    {
+        let n_verts = self.n_verts();
+        let n_verts_other = other.n_verts();
+        let mut new_vert_ids = vec![usize::MAX; n_verts_other];
+
+        for (e, t) in other.elems().zip(other.etags()) {
+            if elem_filter(t) {
+                e.iter().for_each(|&i| new_vert_ids[i] = usize::MAX - 1);
+            }
+        }
+
+        // If needed, merge boundary vertices
+        if let Some(merge_tol) = merge_tol {
+            let other_flg = other.boundary_flag();
+            let n = other_flg.iter().filter(|&&x| x).count();
+            if n > 0 {
+                let mut overts = Vec::with_capacity(n);
+                let mut oids = Vec::with_capacity(n);
+                for (i, &flg) in other_flg.iter().enumerate() {
+                    if flg {
+                        oids.push(i);
+                        overts.push(other.vert(i));
+                    }
+                }
+                let tree = PointIndex::new(overts.iter().cloned());
+                for (i, &flg) in self.boundary_flag().iter().enumerate() {
+                    if flg {
+                        let vx = self.vert(i);
+                        let (i_other, _) = tree.nearest_vert(&vx);
+                        let i_other = oids[i_other];
+                        if (vx - other.vert(i_other)).norm() < merge_tol {
+                            new_vert_ids[i_other] = i;
+                        }
+                    }
+                }
+            }
+        }
+
+        // number & add the new vertices
+        let mut next = n_verts;
+        let mut added_verts = Vec::new();
+        new_vert_ids.iter_mut().enumerate().for_each(|(i, x)| {
+            if *x == usize::MAX - 1 {
+                added_verts.push(i);
+                *x = next;
+                next += 1;
+                self.add_verts(std::iter::once(other.vert(i)));
+            }
+        });
+
+        let mut added_elems = Vec::new();
+        // keep track of the possible new faces
+        let mut all_added_faces = FxHashSet::default();
+        let elem_to_faces = Self::elem_to_faces();
+        for (i, (mut e, t)) in other
+            .elems()
+            .zip(other.etags())
+            .enumerate()
+            .filter(|(_, (_, t))| elem_filter(*t))
+        {
+            added_elems.push(i);
+            e.iter_mut().for_each(|i| *i = new_vert_ids[*i]);
+            self.add_elems(std::iter::once(e), std::iter::once(t));
+            for face in &elem_to_faces {
+                let mut tmp = [0; F];
+                for (i, &j) in face.iter().enumerate() {
+                    tmp[i] = e[j];
+                }
+                all_added_faces.insert(tmp.sorted());
+            }
+        }
+
+        let mut added_faces = Vec::new();
+        for (i, (f, t)) in other
+            .faces()
+            .zip(other.ftags())
+            .enumerate()
+            .filter(|(_, (_, t))| face_filter(*t))
+            .filter(|(_, (mut f, _))| {
+                f.iter_mut().for_each(|i| *i = new_vert_ids[*i]);
+                all_added_faces.contains(&f.sorted())
+            })
+        {
+            added_faces.push(i);
+            self.add_faces(std::iter::once(f), std::iter::once(t));
+        }
+
+        (added_verts, added_elems, added_faces)
+    }
+
+    /// Remove faces based on their tag
+    fn remove_faces<F1: FnMut(Tag) -> bool>(&mut self, mut face_filter: F1) {
+        let mut new_faces = Vec::new();
+        let mut new_ftags = Vec::new();
+
+        for (f, t) in self
+            .faces()
+            .zip(self.ftags())
+            .filter(|(_, t)| !face_filter(*t))
+        {
+            new_faces.push(f);
+            new_ftags.push(t);
+        }
+        self.clear_faces();
+        self.add_faces(new_faces.iter().cloned(), new_ftags.iter().cloned());
     }
 }
 
