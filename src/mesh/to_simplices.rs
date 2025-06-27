@@ -1,4 +1,4 @@
-use crate::{Tetrahedron, Triangle};
+use super::{Tetrahedron, Triangle};
 
 // Subdivision of standard elements to triangles and tetrahedra maintaining a consistent mesh. The algorithms are taken from
 // How to Subdivide Pyramids, Prisms and Hexahedra into Tetrahedra
@@ -48,7 +48,7 @@ fn argmin(arr: &[usize]) -> usize {
 
 /// Convert a quadrangle into 2 triangles
 #[must_use]
-pub(crate) fn qua2tris(quad: &[usize]) -> [Triangle; 2] {
+pub fn qua2tris(quad: &[usize]) -> [Triangle; 2] {
     let mut tri1 = Triangle::default();
     let mut tri2 = Triangle::default();
 
@@ -73,7 +73,7 @@ pub(crate) fn qua2tris(quad: &[usize]) -> [Triangle; 2] {
 
 /// Convert a pyramid into 2 tetrahedra
 #[must_use]
-pub(crate) fn pyr2tets(pyr: &[usize]) -> [Tetrahedron; 2] {
+pub fn pyr2tets(pyr: &[usize]) -> [Tetrahedron; 2] {
     let mut tet1 = Tetrahedron::default();
     let mut tet2 = Tetrahedron::default();
 
@@ -100,7 +100,7 @@ pub(crate) fn pyr2tets(pyr: &[usize]) -> [Tetrahedron; 2] {
 
 /// Convert a prism into 3 tetrahedra
 #[must_use]
-pub(crate) fn pri2tets(pri: &[usize]) -> [Tetrahedron; 3] {
+pub fn pri2tets(pri: &[usize]) -> [Tetrahedron; 3] {
     let imin = argmin(pri);
 
     let mut usize = [0; 6];
@@ -137,7 +137,7 @@ pub(crate) fn pri2tets(pri: &[usize]) -> [Tetrahedron; 3] {
 /// Convert a hex into 5 or 6 tetrahedra
 #[must_use]
 #[allow(clippy::too_many_lines)]
-pub(crate) fn hex2tets(hex: &[usize]) -> ([Tetrahedron; 5], Option<Tetrahedron>) {
+pub fn hex2tets(hex: &[usize]) -> ([Tetrahedron; 5], Option<Tetrahedron>) {
     let imin = argmin(hex);
 
     let mut usize = [0; 8];

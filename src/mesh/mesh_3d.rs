@@ -1,5 +1,8 @@
 //! Tetrahedron meshes in 3d
-use crate::{mesh::Mesh, Tag, Tetrahedron, Triangle, Vert3d};
+use crate::{
+    mesh::{GenericMesh, Mesh},
+    Vert3d,
+};
 
 /// Create a `Mesh<3, 4, 3>` of a `lx` by `ly` by `lz` box by splitting a `nx` by `ny` by `nz`
 /// uniform structured grid
@@ -131,151 +134,18 @@ pub fn nonuniform_box_mesh<M: Mesh<3, 4, 3>>(x: &[f64], y: &[f64], z: &[f64]) ->
 }
 
 /// Tetrahedron mesh in 3d
-pub struct Mesh3d {
-    verts: Vec<Vert3d>,
-    elems: Vec<Tetrahedron>,
-    etags: Vec<Tag>,
-    faces: Vec<Triangle>,
-    ftags: Vec<Tag>,
-}
-
-impl Mesh3d {
-    /// Create a new mesh from coordinates, connectivities and tags
-    pub fn new(
-        verts: Vec<Vert3d>,
-        elems: Vec<Tetrahedron>,
-        etags: Vec<Tag>,
-        faces: Vec<Triangle>,
-        ftags: Vec<Tag>,
-    ) -> Self {
-        Self {
-            verts,
-            elems,
-            etags,
-            faces,
-            ftags,
-        }
-    }
-}
-
-impl Mesh<3, 4, 3> for Mesh3d {
-    fn empty() -> Self {
-        Self {
-            verts: Vec::new(),
-            elems: Vec::new(),
-            etags: Vec::new(),
-            faces: Vec::new(),
-            ftags: Vec::new(),
-        }
-    }
-
-    fn n_verts(&self) -> usize {
-        self.verts.len()
-    }
-
-    fn vert(&self, i: usize) -> &Vert3d {
-        &self.verts[i]
-    }
-
-    fn add_verts<I: ExactSizeIterator<Item = Vert3d>>(&mut self, v: I) {
-        self.verts.extend(v);
-    }
-
-    fn n_elems(&self) -> usize {
-        self.elems.len()
-    }
-
-    fn elem(&self, i: usize) -> &Tetrahedron {
-        &self.elems[i]
-    }
-
-    fn etag(&self, i: usize) -> Tag {
-        self.etags[i]
-    }
-
-    fn add_elems<I1: ExactSizeIterator<Item = Tetrahedron>, I2: ExactSizeIterator<Item = Tag>>(
-        &mut self,
-        elems: I1,
-        etags: I2,
-    ) {
-        self.elems.extend(elems);
-        self.etags.extend(etags);
-    }
-
-    fn clear_elems(&mut self) {
-        self.elems.clear();
-        self.etags.clear();
-    }
-
-    fn add_elems_and_tags<I: ExactSizeIterator<Item = (Tetrahedron, Tag)>>(
-        &mut self,
-        elems_and_tags: I,
-    ) {
-        self.elems.reserve(elems_and_tags.len());
-        self.etags.reserve(elems_and_tags.len());
-        for (e, t) in elems_and_tags {
-            self.elems.push(e);
-            self.etags.push(t);
-        }
-    }
-
-    fn invert_elem(&mut self, i: usize) {
-        let e = self.elems[i];
-        self.elems[i] = [e[1], e[0], e[2], e[3]];
-    }
-
-    fn n_faces(&self) -> usize {
-        self.faces.len()
-    }
-
-    fn face(&self, i: usize) -> &Triangle {
-        &self.faces[i]
-    }
-
-    fn ftag(&self, i: usize) -> Tag {
-        self.ftags[i]
-    }
-
-    fn add_faces<I1: ExactSizeIterator<Item = Triangle>, I2: ExactSizeIterator<Item = Tag>>(
-        &mut self,
-        faces: I1,
-        ftags: I2,
-    ) {
-        self.faces.extend(faces);
-        self.ftags.extend(ftags);
-    }
-
-    fn clear_faces(&mut self) {
-        self.faces.clear();
-        self.ftags.clear();
-    }
-
-    fn add_faces_and_tags<I: ExactSizeIterator<Item = (Triangle, Tag)>>(
-        &mut self,
-        faces_and_tags: I,
-    ) {
-        self.faces.reserve(faces_and_tags.len());
-        self.ftags.reserve(faces_and_tags.len());
-        for (e, t) in faces_and_tags {
-            self.faces.push(e);
-            self.ftags.push(t);
-        }
-    }
-
-    fn invert_face(&mut self, i: usize) {
-        let f = self.faces[i];
-        self.faces[i] = [f[1], f[0], f[2]];
-    }
-}
+pub type Mesh3d = GenericMesh<3, 4, 3>;
 
 #[cfg(test)]
 mod tests {
     use crate::{
         assert_delta,
-        mesh::{bandwidth, cell_center, Mesh},
-        mesh_3d::{box_mesh, Mesh3d},
-        simplices::Simplex,
-        Tetrahedron, Vert3d,
+        mesh::{
+            bandwidth, box_mesh, cell_center,
+            partition::{HilbertPartitioner, KMeansPartitioner3d, RCMPartitioner},
+            BoundaryMesh3d, Mesh, Mesh3d, MutMesh, Simplex, Tetrahedron, Triangle,
+        },
+        Vert3d,
     };
     use rayon::iter::ParallelIterator;
 
@@ -283,10 +153,10 @@ mod tests {
     fn test_box() {
         let msh = box_mesh::<Mesh3d>(1.0, 2, 1.0, 2, 1.0, 2).random_shuffle();
 
-        let faces = msh.compute_faces();
+        let faces = msh.all_faces();
         msh.check(&faces).unwrap();
 
-        let vol = msh.gelems().map(Tetrahedron::vol).sum::<f64>();
+        let vol = msh.gelems().map(|ge| Tetrahedron::vol(&ge)).sum::<f64>();
         assert_delta!(vol, 1.0, 1e-12);
     }
 
@@ -298,7 +168,7 @@ mod tests {
             .par_verts()
             .map(|v| grad[0] * v[0] + grad[1] * v[1] + grad[2] * v[2])
             .collect::<Vec<_>>();
-        let v2v = msh.compute_vertex_to_vertices();
+        let v2v = msh.vertex_to_vertices();
         let gradient = msh.gradient(&v2v, 1, &f).collect::<Vec<_>>();
 
         for &x in &gradient {
@@ -313,14 +183,17 @@ mod tests {
         let v1 = Vert3d::new(1.0, 0.0, 0.0);
         let v2 = Vert3d::new(0.0, 1.0, 0.0);
         let v3 = Vert3d::new(0.0, 0.0, 1.0);
-        let ge = [&v0, &v1, &v2, &v3];
-        assert_delta!(Tetrahedron::vol(ge), 1.0 / 6.0, 1e-12);
-        let ge = [&v0, &v2, &v1, &v3];
-        assert_delta!(Tetrahedron::vol(ge), -1.0 / 6.0, 1e-12);
+        let ge = [v0, v1, v2, v3];
+        assert_delta!(Tetrahedron::vol(&ge), 1.0 / 6.0, 1e-12);
+        let ge = [v0, v2, v1, v3];
+        assert_delta!(Tetrahedron::vol(&ge), -1.0 / 6.0, 1e-12);
 
         let msh = box_mesh::<Mesh3d>(1.0, 10, 2.0, 15, 1.0, 20).random_shuffle();
 
-        let vol = msh.par_gelems().map(Tetrahedron::vol).sum::<f64>();
+        let vol = msh
+            .par_gelems()
+            .map(|ge| Tetrahedron::vol(&ge))
+            .sum::<f64>();
         assert_delta!(vol, 2.0, 1e-12);
 
         let f = msh.par_verts().map(|v| v[0]).collect::<Vec<_>>();
@@ -351,11 +224,11 @@ mod tests {
     #[test]
     fn test_rcm() {
         let msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
-        let avg_bandwidth = bandwidth(msh.elems().cloned()).1;
+        let avg_bandwidth = bandwidth(msh.elems()).1;
         assert!(avg_bandwidth > 1000.0);
 
         let (msh_rcm, vert_ids, elem_ids, face_ids) = msh.reorder_rcm();
-        let avg_bandwidth_rcm = bandwidth(msh_rcm.elems().cloned()).1;
+        let avg_bandwidth_rcm = bandwidth(msh_rcm.elems()).1;
 
         assert!(avg_bandwidth_rcm < 320.0);
 
@@ -365,9 +238,9 @@ mod tests {
         }
 
         for (i, v) in msh_rcm.gelems().enumerate() {
-            let v = cell_center(v);
-            let other = msh.gelem(msh.elem(elem_ids[i]));
-            let other = cell_center(other);
+            let v = cell_center(&v);
+            let other = msh.gelem(&msh.elem(elem_ids[i]));
+            let other = cell_center(&other);
             assert!((v - other).norm() < 1e-12);
         }
 
@@ -377,9 +250,9 @@ mod tests {
         }
 
         for (i, v) in msh_rcm.gfaces().enumerate() {
-            let v = cell_center(v);
-            let other = msh.gface(msh.face(face_ids[i]));
-            let other = cell_center(other);
+            let v = cell_center(&v);
+            let other = msh.gface(&msh.face(face_ids[i]));
+            let other = cell_center(&other);
             assert!((v - other).norm() < 1e-12);
         }
 
@@ -388,6 +261,168 @@ mod tests {
             assert_eq!(tag, other);
         }
 
-        msh_rcm.check(&msh_rcm.compute_faces()).unwrap();
+        msh_rcm.check(&msh_rcm.all_faces()).unwrap();
+    }
+
+    #[test]
+    fn test_part_rcm() {
+        let mut msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
+        let (quality, imbalance) = msh.partition::<RCMPartitioner>(4, None).unwrap();
+
+        assert!(quality < 0.045);
+        assert!(imbalance < 0.0002);
+
+        for i in 0..4 {
+            let part: Mesh3d = msh.get_partition(i);
+            let cc = part.vertex_to_vertices().connected_components().unwrap();
+            let n_cc = cc.iter().cloned().max().unwrap() + 1;
+            assert_eq!(n_cc, 1);
+        }
+    }
+
+    #[test]
+    fn test_hilbert() {
+        let msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
+        let avg_bandwidth = bandwidth(msh.elems()).1;
+        assert!(avg_bandwidth > 1000.0);
+
+        let (msh_hilbert, vert_ids, elem_ids, face_ids) = msh.reorder_hilbert();
+        let avg_bandwidth_hilbert = bandwidth(msh_hilbert.elems()).1;
+        assert!(avg_bandwidth_hilbert < 440.0);
+
+        for (i, v) in msh_hilbert.verts().enumerate() {
+            let other = msh.vert(vert_ids[i]);
+            assert!((v - other).norm() < 1e-12);
+        }
+
+        for (i, v) in msh_hilbert.gelems().enumerate() {
+            let v = cell_center(&v);
+            let other = msh.gelem(&msh.elem(elem_ids[i]));
+            let other = cell_center(&other);
+            assert!((v - other).norm() < 1e-12);
+        }
+
+        for (i, tag) in msh_hilbert.etags().enumerate() {
+            let other = msh.etag(elem_ids[i]);
+            assert_eq!(tag, other);
+        }
+
+        for (i, v) in msh_hilbert.gfaces().enumerate() {
+            let v = cell_center(&v);
+            let other = msh.gface(&msh.face(face_ids[i]));
+            let other = cell_center(&other);
+            assert!((v - other).norm() < 1e-12);
+        }
+
+        for (i, tag) in msh_hilbert.ftags().enumerate() {
+            let other = msh.ftag(face_ids[i]);
+            assert_eq!(tag, other);
+        }
+
+        msh_hilbert.check(&msh_hilbert.all_faces()).unwrap();
+    }
+
+    #[test]
+    fn test_part_hilbert() {
+        let mut msh = box_mesh::<Mesh3d>(1.0, 20, 1.0, 20, 1.0, 20).random_shuffle();
+        let (quality, imbalance) = msh.partition::<HilbertPartitioner>(4, None).unwrap();
+
+        assert!(quality < 0.04);
+        assert!(imbalance < 0.0002);
+
+        for i in 0..4 {
+            let part: Mesh3d = msh.get_partition(i);
+            let cc = part.vertex_to_vertices().connected_components().unwrap();
+            let n_cc = cc.iter().cloned().max().unwrap() + 1;
+            assert_eq!(n_cc, 1);
+        }
+    }
+
+    #[test]
+    fn test_part_kmeans() {
+        let mut msh = box_mesh::<Mesh3d>(1.0, 6, 1.0, 5, 1.0, 5).random_shuffle();
+        let (quality, imbalance) = msh.partition::<KMeansPartitioner3d>(4, None).unwrap();
+
+        assert!(quality < 0.11);
+        assert!(imbalance < 0.04);
+
+        for i in 0..4 {
+            let part: Mesh3d = msh.get_partition(i);
+            let cc = part.vertex_to_vertices().connected_components().unwrap();
+            let n_cc = cc.iter().cloned().max().unwrap() + 1;
+            assert_eq!(n_cc, 1);
+        }
+    }
+
+    #[test]
+    fn test_split() {
+        let msh = box_mesh::<Mesh3d>(1.0, 2, 1.0, 2, 1.0, 2).random_shuffle();
+
+        let msh = msh.split();
+        assert_eq!(msh.n_verts(), 27);
+        assert_eq!(msh.n_faces(), 12 * 4);
+        assert_eq!(msh.n_elems(), 6 * 8);
+
+        let (bdy, _): (BoundaryMesh3d, _) = msh.boundary();
+        let area = bdy.gelems().map(|ge| Triangle::vol(&ge)).sum::<f64>();
+        assert_delta!(area, 6.0, 1e-10);
+
+        let vol = msh.gelems().map(|ge| Tetrahedron::vol(&ge)).sum::<f64>();
+        assert_delta!(vol, 1.0, 1e-10);
+    }
+
+    #[test]
+    fn test_skewness_3d() {
+        let mesh = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+
+        let all_faces = mesh.all_faces();
+        let count = mesh
+            .face_skewnesses(&all_faces)
+            .map(|(_, _, s)| assert!(s < 0.5, "{s}"))
+            .count();
+        assert_eq!(count, 72);
+    }
+
+    #[test]
+    fn test_edge_ratio_3d() {
+        let mesh = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+
+        let count = mesh
+            .edge_length_ratios()
+            .map(|s| assert!(s < 3.0_f64.sqrt() + 1e-6))
+            .count();
+        assert_eq!(count, 48);
+    }
+
+    #[test]
+    fn test_gamma_3d() {
+        let mesh = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+
+        let (gamma_min, gamma_max) = mesh
+            .elem_gammas()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |a, b| {
+                (a.0.min(b), a.1.max(b))
+            });
+        assert!((gamma_min - 0.717).abs() < 1e-3);
+        assert!((gamma_max - 0.717).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_add_3d() {
+        let mut mesh1 = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+        assert_eq!(mesh1.n_tagged_faces(6), 8);
+        assert_eq!(mesh1.n_tagged_faces(11), 0);
+
+        let mut mesh2 = box_mesh::<Mesh3d>(1.0, 3, 1.0, 3, 1.0, 3).random_shuffle();
+        mesh2
+            .verts_mut()
+            .for_each(|x| *x += Vert3d::new(1.0, 0.5, 0.5));
+        mesh2.ftags_mut().for_each(|t| *t += 10);
+
+        mesh1.add(&mesh2, |_| true, |_| true, Some(1e-12));
+
+        assert_eq!(mesh1.n_verts(), 2 * mesh2.n_verts() - 4);
+        assert_eq!(mesh1.n_tagged_faces(6), 8);
+        assert_eq!(mesh1.n_tagged_faces(11), 8);
     }
 }

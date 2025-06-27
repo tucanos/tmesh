@@ -1,11 +1,9 @@
 //! Extrude 2d triangle meshes to 3d as 1 layer of prisms
 use crate::{
-    dual_mesh_2d::DualMesh2d,
-    mesh::Mesh,
-    mesh_2d::Mesh2d,
-    poly_mesh::{merge_polylines, PolyMesh, PolyMeshType, SimplePolyMesh},
-    vtu_output::{Encoding, VTUFile},
-    Error, Prism, Quadrangle, Result, Tag, Triangle, Vert2d, Vert3d,
+    dual::{merge_polylines, DualMesh2d, PolyMesh, PolyMeshType, SimplePolyMesh},
+    io::{VTUEncoding, VTUFile},
+    mesh::{Mesh, Mesh2d, Prism, Quadrangle, Triangle},
+    Error, Result, Tag, Vert2d, Vert3d,
 };
 
 /// Extrusion of a `Mesh2d` along `z`
@@ -58,7 +56,7 @@ impl ExtrudedMesh2d {
             .collect::<Vec<_>>();
         let etags = msh.etags().collect::<Vec<_>>();
 
-        let mut tris = msh.elems().cloned().collect::<Vec<_>>();
+        let mut tris = msh.elems().collect::<Vec<_>>();
         tris.extend(msh.elems().map(|tri| [tri[0] + n, tri[2] + n, tri[1] + n]));
         let mut tri_tags = vec![Tag::MAX; msh.n_elems()];
         tri_tags.resize(2 * msh.n_elems(), Tag::MAX - 1);
@@ -110,7 +108,7 @@ impl ExtrudedMesh2d {
         let faces = self.quads.iter().map(|p| [p[0], p[1]]).collect::<Vec<_>>();
         let ftags = self.quad_tags.clone();
 
-        Ok(Mesh2d::new(verts, elems, etags, faces, ftags))
+        Ok(Mesh2d::new(&verts, &elems, &etags, &faces, &ftags))
     }
 
     /// Number of vertices
@@ -119,8 +117,8 @@ impl ExtrudedMesh2d {
     }
 
     /// Sequential iterator over the vertices
-    pub fn verts(&self) -> impl ExactSizeIterator<Item = &Vert3d> + '_ {
-        self.verts.iter()
+    pub fn verts(&self) -> impl ExactSizeIterator<Item = Vert3d> + '_ {
+        self.verts.iter().cloned()
     }
 
     /// Number of prisms
@@ -170,7 +168,7 @@ impl ExtrudedMesh2d {
 
     /// Write the mesh in a `.vtu` file
     pub fn write_vtk(&self, file_name: &str) -> Result<()> {
-        let vtu = VTUFile::from_extruded_mesh(self, Encoding::Binary);
+        let vtu = VTUFile::from_extruded_mesh(self, VTUEncoding::Binary);
 
         vtu.export(file_name)?;
 
@@ -237,11 +235,8 @@ impl DualMesh2d {
 #[cfg(test)]
 mod tests {
     use crate::{
-        dual_mesh::DualMesh,
-        dual_mesh_2d::DualMesh2d,
-        mesh::Mesh,
-        mesh_2d::{rectangle_mesh, Mesh2d},
-        // poly_mesh::PolyMesh,
+        dual::{DualMesh, DualMesh2d, DualType},
+        mesh::{rectangle_mesh, Mesh, Mesh2d},
     };
 
     use super::ExtrudedMesh2d;
@@ -259,7 +254,7 @@ mod tests {
     #[test]
     fn test_extrude_dual() {
         let msh = rectangle_mesh::<Mesh2d>(1.0, 10, 2.0, 15);
-        let dual = DualMesh2d::new(&msh, crate::dual_mesh::DualType::Median);
+        let dual = DualMesh2d::new(&msh, DualType::Median);
         let _extruded = dual.extrude(1.0);
         // extruded.write_vtk("extruded_self.vtu").unwrap();
     }

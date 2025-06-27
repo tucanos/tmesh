@@ -13,3 +13,4 @@ build/
 *.so
 .cargo/
 *.code-workspace
+*.stl

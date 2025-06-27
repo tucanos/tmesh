@@ -1,12 +1,8 @@
 //! Computation of the dual for `Mesh<2, 3, 2>`
-use crate::dual_mesh::{circumcenter_bcoords, DualCellCenter};
-use crate::mesh::cell_vertex;
-use crate::poly_mesh::{PolyMesh, PolyMeshType};
+use super::{circumcenter_bcoords, DualCellCenter, DualMesh, DualType, PolyMesh, PolyMeshType};
 use crate::{
-    dual_mesh::{DualMesh, DualType},
-    mesh::{cell_center, sort_elem_min_ids, Mesh},
-    simplices::Simplex,
-    Edge, Tag, Triangle, Vert2d,
+    mesh::{cell_center, cell_vertex, sort_elem_min_ids, Edge, Mesh, Simplex, Triangle},
+    Tag, Vert2d,
 };
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
@@ -25,7 +21,7 @@ pub struct DualMesh2d {
 }
 
 impl DualMesh2d {
-    fn get_tri_center(v: [&Vert2d; 3], t: DualType) -> DualCellCenter<2, 2> {
+    fn get_tri_center(v: &[Vert2d; 3], t: DualType) -> DualCellCenter<2, 2> {
         match t {
             DualType::Median => DualCellCenter::Vertex(cell_center(v)),
             DualType::Barth | DualType::ThresholdBarth(_) => {
@@ -59,8 +55,8 @@ impl PolyMesh<2> for DualMesh2d {
         self.verts.len()
     }
 
-    fn vert(&self, i: usize) -> &Vert2d {
-        &self.verts[i]
+    fn vert(&self, i: usize) -> Vert2d {
+        self.verts[i]
     }
 
     fn n_elems(&self) -> usize {
@@ -93,20 +89,20 @@ impl PolyMesh<2> for DualMesh2d {
 impl DualMesh<2, 3, 2> for DualMesh2d {
     fn new<M: Mesh<2, 3, 2>>(msh: &M, t: DualType) -> Self {
         // edges
-        let all_edges = msh.compute_edges();
+        let all_edges = msh.edges();
         let n_edges = all_edges.len();
 
         let n_elems = msh.n_elems();
 
         // vertices: boundary
         let mut bdy_verts: FxHashMap<usize, usize> =
-            msh.faces().flatten().map(|&i| (i, 0)).collect();
+            msh.faces().flatten().map(|i| (i, 0)).collect();
         let n_bdy_verts = bdy_verts.len();
 
         let mut verts = Vec::with_capacity(n_bdy_verts + n_edges + n_elems);
         for (&i_old, i_new) in bdy_verts.iter_mut() {
             *i_new = verts.len();
-            verts.push(*msh.vert(i_old));
+            verts.push(msh.vert(i_old));
         }
         let vert_ids_bdy = |i: usize| *bdy_verts.get(&i).unwrap();
 
@@ -114,14 +110,14 @@ impl DualMesh<2, 3, 2> for DualMesh2d {
         verts.resize(verts.len() + n_edges, Vert2d::zeros());
         let vert_idx_edge = |i: usize| i + n_bdy_verts;
         for (&edge, &i_edge) in all_edges.iter() {
-            verts[vert_idx_edge(i_edge)] = cell_center([msh.vert(edge[0]), msh.vert(edge[1])]);
+            verts[vert_idx_edge(i_edge)] = cell_center(&[msh.vert(edge[0]), msh.vert(edge[1])]);
         }
 
         // vertices: triangle centers
         let mut vert_idx_elem = vec![usize::MAX; n_elems];
         for (i_elem, e) in msh.elems().enumerate() {
-            let ge = msh.gelem(e);
-            let center = Self::get_tri_center(ge, t);
+            let ge = msh.gelem(&e);
+            let center = Self::get_tri_center(&ge, t);
             match center {
                 DualCellCenter::Vertex(center) => {
                     vert_idx_elem[i_elem] = verts.len();
@@ -179,8 +175,8 @@ impl DualMesh<2, 3, 2> for DualMesh2d {
                 };
                 let face = [vert_idx_edge(i_edge), vert_idx_elem[i_elem]];
                 if face[0] != face[1] {
-                    let gf = [&verts[face[0]], &verts[face[1]]];
-                    edge_normals[i_edge] += sgn * Edge::normal(gf);
+                    let gf = [verts[face[0]], verts[face[1]]];
+                    edge_normals[i_edge] += sgn * Edge::normal(&gf);
 
                     let i_new_face = faces.len();
                     faces.push(face);
@@ -224,8 +220,8 @@ impl DualMesh<2, 3, 2> for DualMesh2d {
 
             let face = [vert_ids_bdy(f[0]), vert_idx_edge(i_edge)];
             if face[0] != face[1] {
-                let gf = [&verts[face[0]], &verts[face[1]]];
-                bdy_faces.push((f[0], tag, Edge::normal(gf)));
+                let gf = [verts[face[0]], verts[face[1]]];
+                bdy_faces.push((f[0], tag, Edge::normal(&gf)));
 
                 let i_new_face = faces.len();
                 faces.push(face);
@@ -243,8 +239,8 @@ impl DualMesh<2, 3, 2> for DualMesh2d {
                 assert!(ok);
 
                 let face = [vert_idx_edge(i_edge), vert_ids_bdy(f[1])];
-                let gf = [&verts[face[0]], &verts[face[1]]];
-                bdy_faces.push((f[0], tag, Edge::normal(gf)));
+                let gf = [verts[face[0]], verts[face[1]]];
+                bdy_faces.push((f[0], tag, Edge::normal(&gf)));
 
                 let i_new_face = faces.len();
                 faces.push(face);
@@ -294,7 +290,7 @@ impl DualMesh<2, 3, 2> for DualMesh2d {
             edges[i_edg] = edg;
         }
 
-        let ids = sort_elem_min_ids(edges.iter().copied());
+        let ids = sort_elem_min_ids(edges.iter().cloned());
         let edges = ids
             .iter()
             .filter(|&&i| edge_normals[i].norm() > 1e-12)
@@ -346,13 +342,9 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        dual_mesh::{DualMesh, DualType},
-        dual_mesh_2d::DualMesh2d,
-        mesh::Mesh,
-        mesh_2d::{rectangle_mesh, Mesh2d},
-        poly_mesh::PolyMesh,
-        simplices::Simplex,
-        Edge, Vert2d,
+        dual::{DualMesh, DualMesh2d, DualType, PolyMesh},
+        mesh::{rectangle_mesh, Edge, Mesh, Mesh2d, Simplex},
+        Vert2d,
     };
     use rayon::iter::ParallelIterator;
 
@@ -371,7 +363,7 @@ mod tests {
 
         let n_empty_faces = dual
             .par_gfaces()
-            .filter(|&gf| Edge::normal(gf).norm() < 1e-12)
+            .filter(|gf| Edge::normal(gf).norm() < 1e-12)
             .count();
         assert_eq!(n_empty_faces, 0);
     }
@@ -390,7 +382,7 @@ mod tests {
 
         let n_empty_faces = dual
             .par_gfaces()
-            .filter(|&gf| Edge::normal(gf).norm() < 1e-10)
+            .filter(|gf| Edge::normal(gf).norm() < 1e-10)
             .count();
         assert_eq!(n_empty_faces, 0);
 
@@ -419,7 +411,7 @@ mod tests {
 
         let n_empty_faces = dual
             .par_gfaces()
-            .filter(|&gf| Edge::normal(gf).norm() < 1e-10)
+            .filter(|gf| Edge::normal(gf).norm() < 1e-10)
             .count();
         assert_eq!(n_empty_faces, 0);
 
